@@ -1,18 +1,6 @@
 import pytchat
 import re
 
-class CommentAuthors:
-    def __init__(self):
-        self.authors = set()  # Używamy zbioru, aby uniknąć duplikatów
-
-    def add_author(self, author):
-        self.authors.add(author)
-
-    def get_authors(self):
-        return self.authors
-
-    def delete_author(self, author):
-        self.authors.discard(author)
 
 def get_video_id(url):
      """
