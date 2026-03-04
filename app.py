@@ -1,6 +1,18 @@
 import pytchat
 import re
 
+class CommentAuthors:
+    def __init__(self):
+        self.authors = set()  # Używamy zbioru, aby uniknąć duplikatów
+
+    def add_author(self, author):
+        self.authors.add(author)
+
+    def get_authors(self):
+        return self.authors
+
+    def delete_author(self, author):
+        self.authors.discard(author)
 
 def get_video_id(url):
      """
@@ -20,7 +32,7 @@ def collect_comments(video_url, author_manager):
         print("Invalid YouTube URL")
         return
 
-    chat = pytchat.create(video_id="3IAo_TUCWQA")
+    chat = pytchat.create(video_id=video_id)
     while chat.is_alive():
         for c in chat.get().sync_items():
             print(f"{c.author.name}")
@@ -33,4 +45,4 @@ def main(video_url):
 
 if __name__ == "__main__":
     print("Starting to collect comments...")
-    main("https://www.youtube.com/watch?v=3IAo_TUCWQA")
+    main("https://www.youtube.com/watch?v=FmEtlArOQnw")
