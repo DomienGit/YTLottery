@@ -37,6 +37,7 @@ def thread_collect_comments(video_url, author_manager, stop_event):
         while chat.is_alive():
             for c in chat.get().sync_items():
                 author_manager.add_author(c.author.name)
+                print(f"Znaleziono autora: {c.author.name}")
                 if stop_event.is_set():
                     chat.terminate()
                     break
