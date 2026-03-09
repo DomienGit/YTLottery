@@ -27,7 +27,7 @@ def get_video_id(url):
          return match.group(1)
      return None
 
-def collect_comments(video_url, author_manager):
+def thread_collect_comments(video_url, author_manager, stop_event):
     try:
         video_id = get_video_id(video_url)
         if not video_id:
@@ -36,8 +36,11 @@ def collect_comments(video_url, author_manager):
         chat = pytchat.create(video_id=video_id)
         while chat.is_alive():
             for c in chat.get().sync_items():
-                print(f"{c.author.name}")
                 author_manager.add_author(c.author.name)
+                if stop_event.is_set():
+                    chat.terminate()
+                    break
+
 
     except Exception as e:
         return False

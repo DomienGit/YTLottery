@@ -1,5 +1,6 @@
 import streamlit as st
-from logic import collect_comments, CommentAuthors, get_video_id
+from logic import thread_collect_comments, CommentAuthors, get_video_id
+import threading
 
 st.set_page_config(page_title="YT Lottery", page_icon=":tada:", layout="centered")
 st.title("YT Lottery")
@@ -13,6 +14,10 @@ if 'video_id' not in st.session_state:
     st.session_state.video_id = None
 if 'url_confirmed' not in st.session_state:
     st.session_state.url_confirmed = False
+if 'stop_event' not in st.session_state:
+    st.session_state.stop_event = None
+if 'active_thread' not in st.session_state:
+    st.session_state.active_thread = None
 
 entered_url = st.text_input("Wklej URL do transmisji/filmu YouTube:", placeholder="https://www.youtube.com/watch?v=VIDEO_ID_HERE", key="url_input")
 
@@ -39,18 +44,18 @@ if st.session_state.url_confirmed:
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Rozpocznij zbieranie komentarzy", type="primary"):
+            st.session_state.stop_event = threading.Event()  # Używamy Event do kontrolowania wątku    
             st.info("Rozpoczynanie zbierania komentarzy... Może to potrwać, a dla streamów na żywo funkcja `collect_comments` będzie blokować aplikację.")
             # Wyczyść poprzednich autorów przed rozpoczęciem nowego zbierania
             st.session_state.author_manager = CommentAuthors()
-            success = collect_comments(st.session_state.video_url, st.session_state.author_manager)
-            if success:
-                st.success(f"Zakończono zbieranie komentarzy. Znaleziono {len(st.session_state.author_manager.get_authors())} unikalnych autorów.")
-            else:
-                st.error("Nie udało się zebrać komentarzy. Sprawdź URL lub spróbuj ponownie.")
+            st.session_state.active_thread = threading.Thread(target=thread_collect_comments, args=(st.session_state.video_url, st.session_state.author_manager, st.session_state.stop_event))
+            st.session_state.active_thread.start()
+
     with col2:
         if st.button("Zatrzymaj zbieranie"):
             st.warning("Zatrzymywanie zbierania komentarzy nie jest w pełni zaimplementowane dla blokującej funkcji `collect_comments`. Wymagałoby to uruchomienia w osobnym wątku.")
             # Placeholder dla logiki zatrzymywania
+            st.session_state.stop_event.set()
 
     # Wyświetlanie zebranych autorów w celach testowych
     if st.session_state.author_manager.get_authors():
