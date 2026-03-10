@@ -57,9 +57,12 @@ if st.session_state.url_confirmed:
             # Placeholder dla logiki zatrzymywania
             st.session_state.stop_event.set()
 
-    # Wyświetlanie zebranych autorów w celach testowych
-    if st.session_state.author_manager.get_authors():
-        st.write("### Zebrani unikalni autorzy (pierwsze 10):")
-        for author in list(st.session_state.author_manager.get_authors())[:10]: # Wyświetl pierwszych 10
+    if st.session_state.active_thread and st.session_state.active_thread.is_alive():
+        st.info("Zbieranie komentarzy w toku... Odśwież stronę, aby zobaczyć aktualną listę.")
+    
+    authors = st.session_state.author_manager.get_authors()
+    if authors:
+        st.write(f"### Zebrani unikalni autorzy ({len(authors)}):")
+        for author in sorted(list(authors)): # Display all authors, sorted for consistency
             st.write(f"- {author}")
     
