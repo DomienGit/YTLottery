@@ -1,6 +1,7 @@
 import streamlit as st
 from logic import thread_collect_comments, CommentAuthors, get_video_id
 import threading
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="YT Lottery", page_icon=":tada:", layout="centered")
 st.title("YT Lottery")
@@ -50,16 +51,25 @@ if st.session_state.url_confirmed:
             st.session_state.author_manager = CommentAuthors()
             st.session_state.active_thread = threading.Thread(target=thread_collect_comments, args=(st.session_state.video_url, st.session_state.author_manager, st.session_state.stop_event))
             st.session_state.active_thread.start()
+            st.rerun() # Rerun to start autorefresh immediately
 
     with col2:
         if st.button("Zatrzymaj zbieranie"):
             st.warning("Zatrzymywanie zbierania komentarzy nie jest w pełni zaimplementowane dla blokującej funkcji `collect_comments`. Wymagałoby to uruchomienia w osobnym wątku.")
             # Placeholder dla logiki zatrzymywania
             st.session_state.stop_event.set()
+            st.rerun() # Rerun to stop autorefresh immediately
 
     if st.session_state.active_thread and st.session_state.active_thread.is_alive():
-        st.info("Zbieranie komentarzy w toku... Odśwież stronę, aby zobaczyć aktualną listę.")
-    
+        st_autorefresh(interval=2000, key="comment_refresher")
+        st.info("Zbieranie komentarzy w toku... Lista odświeża się automatycznie.")
+    else:
+        if st.session_state.get('stop_event') and st.session_state.stop_event.is_set():
+            st.success("Zbieranie komentarzy zostało zatrzymane.")
+        elif st.session_state.get('active_thread') is not None:
+            st.success("Zbieranie komentarzy zakończone.")
+
+
     authors = st.session_state.author_manager.get_authors()
     if authors:
         st.write(f"### Zebrani unikalni autorzy ({len(authors)}):")
