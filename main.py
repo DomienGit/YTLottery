@@ -19,6 +19,8 @@ if 'stop_event' not in st.session_state:
     st.session_state.stop_event = None
 if 'active_thread' not in st.session_state:
     st.session_state.active_thread = None
+if 'collection_status' not in st.session_state:
+    st.session_state.collection_status = "idle" # "idle", "running", "stopped", "finished"
 
 entered_url = st.text_input("Wklej URL do transmisji/filmu YouTube:", placeholder="https://www.youtube.com/watch?v=VIDEO_ID_HERE", key="url_input")
 
@@ -51,24 +53,31 @@ if st.session_state.url_confirmed:
             st.session_state.author_manager = CommentAuthors()
             st.session_state.active_thread = threading.Thread(target=thread_collect_comments, args=(st.session_state.video_url, st.session_state.author_manager, st.session_state.stop_event))
             st.session_state.active_thread.start()
+            st.session_state.collection_status = "running" # Set status to running
             st.rerun() # Rerun to start autorefresh immediately
 
     with col2:
         if st.button("Zatrzymaj zbieranie"):
             st.warning("Zatrzymywanie zbierania komentarzy nie jest w pełni zaimplementowane dla blokującej funkcji `collect_comments`. Wymagałoby to uruchomienia w osobnym wątku.")
-            # Placeholder dla logiki zatrzymywania
             st.session_state.stop_event.set()
+            st.session_state.collection_status = "stopped" # Set status to stopped
             st.rerun() # Rerun to stop autorefresh immediately
 
-    if st.session_state.active_thread and st.session_state.active_thread.is_alive():
+    # Display logic based on collection_status
+    if st.session_state.collection_status == "running":
         st_autorefresh(interval=2000, key="comment_refresher")
         st.info("Zbieranie komentarzy w toku... Lista odświeża się automatycznie.")
-    else:
-        if st.session_state.get('stop_event') and st.session_state.stop_event.is_set():
-            st.success("Zbieranie komentarzy zostało zatrzymane.")
-        elif st.session_state.get('active_thread') is not None:
-            st.success("Zbieranie komentarzy zakończone.")
-
+        # Check if the thread has unexpectedly died while it should be running
+        if not st.session_state.active_thread.is_alive():
+            st.session_state.collection_status = "finished"
+            st.warning("Zbieranie komentarzy zakończone przedwcześnie lub napotkało błąd.")
+            st.rerun() # To update the status message
+    elif st.session_state.collection_status == "stopped":
+        st.success("Zbieranie komentarzy zostało zatrzymane przez użytkownika.")
+    elif st.session_state.collection_status == "finished":
+        st.success("Zbieranie komentarzy zakończone.")
+    elif st.session_state.collection_status == "idle":
+        st.info("Gotowy do zbierania komentarzy. Wprowadź URL i słowo kluczowe, a następnie naciśnij 'Rozpocznij'.")
 
     authors = st.session_state.author_manager.get_authors()
     if authors:
