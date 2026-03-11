@@ -1,9 +1,9 @@
-import threading
+import multiprocessing
 import pytchat
 import time
 import re
 
-stop_event = threading.Event()
+stop_event = multiprocessing.Event()
 
 def _get_video_id(url):
      """
@@ -28,9 +28,10 @@ def start_chat_listener(video_url):
         for c in chat.get().sync_items():
             print(c.author.name)
 
+
 if __name__ == "__main__":
     video_url = input("Podaj link do filmu YouTube: ")
-    threaded_chat_listener = threading.Thread(target=start_chat_listener, args=(video_url,))
+    threaded_chat_listener = multiprocessing.Process(target=start_chat_listener, args=(video_url,))
     threaded_chat_listener.start()
     ask = input("Naciśnij Enter, aby zatrzymać zbieranie komentarzy...")
     stop_event.set()
