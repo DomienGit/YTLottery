@@ -50,4 +50,3 @@ def pick_random_author(author_manager):
     if not authors:
         return None
     return random.choice(authors)
-
