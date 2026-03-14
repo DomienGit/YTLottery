@@ -1,6 +1,6 @@
 Załozenia dzialania aplikacji
 
--Uzytkownik uruchamia link odtwarza sie aplikacja webowa ktora jest hostowana na streamlit
+-Uzytkownik uruchamia link odtwarza sie aplikacja webowa
 -Uzytkownik wpisuje url do transmisji live
 -Przyciska potwierdz w celu potwierdzenia linku
 -naciska przycisk uruchamiania pobierania autorow komentarzy
