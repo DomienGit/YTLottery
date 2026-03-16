@@ -51,6 +51,15 @@ def get_video_id(url):
             return match.group(1)
         return None
 
+def validate_video_url(url):
+        """
+        Waliduje, czy podany URL jest poprawnym linkiem do filmu na YouTube.
+        Zwraca True, jeśli URL jest poprawny, w przeciwnym razie False.
+        """
+        video_id = get_video_id(url)
+        chat = pytchat.create(video_id=video_id)
+        return chat.is_alive()
+
 def start_chat_listener(video_url, stop_event, authors_manager):
         """
         Funkcja nasłuchująca czat, działająca w osobnym procesie.
