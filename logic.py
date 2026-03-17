@@ -2,6 +2,7 @@ import multiprocessing
 import pytchat
 import time
 import re
+import random
 
 stop_event_global = multiprocessing.Event() # Zmieniona nazwa, żeby nie kolidować z argumentem funkcji
 
@@ -19,6 +20,11 @@ class AuthorsManager:
     
     def get_authors(self):
         return self.authors_set
+    
+    def draw_winner(self):
+        if not self.authors_set:
+            return None
+        return random.choice(list(self.authors_set))
 
 class AppManager:
     def __init__(self):
@@ -26,10 +32,10 @@ class AppManager:
         self.stop_event = multiprocessing.Event()
         self.process = None
 
-    def start_listener(self):
+    def start_listener(self, video_url):
         self.authors_manager.clear_all()  # Resetujemy zarządzany zbiór
         self.stop_event.clear()  # Resetujemy zdarzenie stop
-        self.process = multiprocessing.Process(target=start_chat_listener, args=(self.video_url, self.stop_event, self.authors_manager))
+        self.process = multiprocessing.Process(target=start_chat_listener, args=(video_url, self.stop_event, self.authors_manager))
         self.process.start()
     
     def stop_listener(self):
