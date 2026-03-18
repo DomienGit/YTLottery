@@ -66,4 +66,11 @@ def delete_author(author_name: str):
         "success": True,
         "message": f"Author '{author_name}' deleted"}
 
+@app.post("/clear")
+def clear_authors():
+    app_manager.authors_manager.clear_authors()
+    return {
+        "success": True,
+        "message": "All authors cleared"}
+
 
