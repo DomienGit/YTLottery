@@ -1,7 +1,7 @@
 import uvicorn
 from fastapi import FastAPI
 from logic import AppManager
-from logic import validate_video_url, start_chat_listener
+from logic import validate_video_url, start_chat_listener, create_chat_connection
 
 app = FastAPI()
 app_manager = AppManager()
@@ -24,18 +24,21 @@ def apply_url(video_url: str):
         return {
             "success": False,
             "message": "Type a video URL"}
-    if not validate_video_url(video_url):
+    
+    app_manager.start_listener(video_url)
+    queue_response = app_manager.from_listener_to_main_queue.get()  # Odbieramy odpowiedź z procesu nasłuchującego
+    if not queue_response["success"]:
         return {
             "success": False,
-            "message": "Invalid video URL"}   
+            "message": queue_response["message"]}
     return {
         "success": True,
         "message": f"Video URL validated",
         "url": video_url}   
 
-@app.post("/start/{video_url}")
-def start_listener(video_url: str):
-    app_manager.start_listener(video_url)
+@app.post("/start")
+def start_listener():
+    app_manager.from_main_to_listener_queue.put({"status": "start"})  # Wysyłamy polecenie do procesu nasłuchującego
     return {
         "success": True,
         "message": "Chat listener started"}

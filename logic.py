@@ -83,10 +83,11 @@ def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_lis
         """
         chat = create_chat_connection(video_url)
         if chat is None:
-            from_listener_to_main_queue.put("error:invalid_url")
-            return
-        from_listener_to_main_queue.put("success:listener_started")
+            from_listener_to_main_queue.put({"success": False, "message": "Invalid video URL"})
+            return None
+        from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
 
+        from_main_to_listener_queue.get()  # Oczekujemy na polecenie z głównego procesu
         
         while not stop_event.is_set() and chat.is_alive():
             try:
