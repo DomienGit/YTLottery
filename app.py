@@ -1,10 +1,15 @@
+import os
 import uvicorn
 from fastapi import FastAPI
 from logic import AppManager
-from logic import validate_video_url, start_chat_listener, create_chat_connection
 
 app = FastAPI()
-app_manager = AppManager()
+app_manager: AppManager = None
+
+@app.on_event("startup")
+def startup_event():
+    global app_manager
+    app_manager = AppManager()
 
 @app.get("/")
 def read_root():
@@ -76,4 +81,6 @@ def clear_authors():
         "success": True,
         "message": "All authors cleared"}
 
-
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
