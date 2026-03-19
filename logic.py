@@ -4,7 +4,6 @@ import time
 import re
 import random
 
-stop_event_global = multiprocessing.Event() # Zmieniona nazwa, żeby nie kolidować z argumentem funkcji
 
 class AuthorsManager:
     def __init__(self):
@@ -54,10 +53,12 @@ class AppManager:
     
     def stop_listener(self):
         self.stop_event.set()  # Ustawiamy zdarzenie stop
-        if self.process is not None:
-            self.process.join(timeout=3)
-        if self.process:
-            self.process.terminate()  # Czekamy na zakończenie procesu
+        if self.process and self.process.is_alive():
+            self.from_main_to_listener_queue.put({"command": "shutdown"})
+            self.process.join(timeout=3) # Dajemy mu czas na łagodne zamknięcie
+        if self.process and self.process.is_alive(): # Sprawdzamy ponownie, czy nadal żyje
+            self.process.terminate()  # Jeśli nie zamknął się łagodnie, wymuszamy zamknięcie
+        self.process = None # Resetujemy referencję do procesu
 
 def get_video_id(url):
         """
@@ -72,9 +73,12 @@ def get_video_id(url):
         return None
 
 def create_chat_connection(url):
-        video_id = get_video_id(url)
-        chat = pytchat.create(video_id=video_id)
-        return chat
+        try:
+            video_id = get_video_id(url)
+            chat = pytchat.create(video_id=video_id)
+            return chat
+        except:
+            return None
 
 def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_listener_queue, from_listener_to_main_queue):
         """
@@ -87,8 +91,10 @@ def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_lis
             return None
         from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
 
-        from_main_to_listener_queue.get()  # Oczekujemy na polecenie z głównego procesu
-        
+        command = from_main_to_listener_queue.get()
+        if command.get("command") == "shutdown":
+            return 
+
         while not stop_event.is_set() and chat.is_alive():
             try:
                 for c in chat.get().sync_items():
