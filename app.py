@@ -1,9 +1,25 @@
 import os
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse  # Dodaj to
 from logic import AppManager
+from pydantic import BaseModel
+
+class VideoURL(BaseModel):
+    url: str
+
+class AuthorRequest(BaseModel):
+    name: str
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app_manager: AppManager = None
 
 @app.on_event("startup")
@@ -13,9 +29,15 @@ def startup_event():
 
 @app.get("/")
 def read_root():
-    return {
-        "success": True,
-        "message": "welcome to the YouTube Chat Listener"}
+    return FileResponse("index.html")
+
+@app.get("/style.css")
+def get_style():
+    return FileResponse("style.css")
+
+@app.get("/script.js")
+def get_script():
+    return FileResponse("script.js")
 
 @app.get("/authors")
 def get_authors():
@@ -23,15 +45,16 @@ def get_authors():
         "success": True,
         "message": list(app_manager.authors_manager.get_authors())}
 
-@app.post("/apply-url/{video_url}")
-def apply_url(video_url: str):
+@app.post("/apply-url")
+def apply_url(data: VideoURL):
+    video_url = data.url
     if not video_url:
         return {
             "success": False,
             "message": "Type a video URL"}
     
     app_manager.start_listener(video_url)
-    queue_response = app_manager.from_listener_to_main_queue.get()  # Odbieramy odpowiedź z procesu nasłuchującego
+    queue_response = app_manager.from_listener_to_main_queue.get()
     if not queue_response["success"]:
         return {
             "success": False,
@@ -43,7 +66,7 @@ def apply_url(video_url: str):
 
 @app.post("/start")
 def start_listener():
-    app_manager.from_main_to_listener_queue.put({"status": "start"})  # Wysyłamy polecenie do procesu nasłuchującego
+    app_manager.from_main_to_listener_queue.put({"status": "start"})
     return {
         "success": True,
         "message": "Chat listener started"}
@@ -67,15 +90,22 @@ def draw_winner():
         "message": "Winner drawn",
         "winner": winner}
 
-@app.post("/delete/{author_name}")
-def delete_author(author_name: str):
-    app_manager.authors_manager.delete_author(author_name)
+@app.post("/delete")
+def delete_author(data: AuthorRequest):
+    app_manager.authors_manager.delete_author(data.name)
     return {
         "success": True,
-        "message": f"Author '{author_name}' deleted"}
+        "message": f"Author '{data.name}' deleted"}
+
+@app.post("/add-author")
+def add_author(data: AuthorRequest):
+    app_manager.authors_manager.add_author(data.name)
+    return {
+        "success": True,
+        "message": f"Author '{data.name}' added"}
 
 @app.post("/clear")
-def clear_authors():
+def clear_authors(data: dict = None): # Dodano dict, aby przyjąć {} z frontendu
     app_manager.authors_manager.clear_authors()
     return {
         "success": True,
@@ -83,4 +113,4 @@ def clear_authors():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=True)

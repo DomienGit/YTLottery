@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT Lottery - Czat na żywo</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>YT <span>Lottery</span></h1>
+            <p>Losowanie zwycięzców z czatu YouTube</p>
+        </header>
+
+        <!-- KROK 1: Tylko to widoczne na starcie -->
+        <section id="urlPanel" class="config-panel">
+            <div class="input-group">
+                <input type="text" id="videoUrl" placeholder="Wklej link do transmisji YouTube...">
+                <button id="btnConfirm" class="btn-primary">Potwierdź</button>
+            </div>
+            <div id="statusMessage" class="status-message"></div>
+        </section>
+
+        <!-- KROK 2: Przyciski sterujące -->
+        <section id="controlsPanel" class="controls hidden">
+            <button id="btnStart" class="btn-success">Uruchom pobieranie</button>
+            <button id="btnStop" class="btn-danger hidden">Stop</button>
+            <button id="btnDraw" class="btn-warning hidden">Losuj zwycięzcę</button>
+            <button id="btnClear" class="btn-outline hidden">Wyczyść listę</button>
+        </section>
+
+        <!-- KROK 2: Lista i dodawanie ręczne -->
+        <main id="mainContent" class="content hidden">
+            <div class="stats">
+                <span>Unikalni autorzy: <strong id="authorCount">0</strong></span>
+            </div>
+            
+            <div id="authorList" class="author-list">
+                <!-- Tu pojawiają się autorzy -->
+                <div class="empty-state">Brak autorów na liście.</div>
+            </div>
+
+            <!-- Panel ręcznego dodawania (pod listą) -->
+            <div id="manualAddSection" class="manual-add-item">
+                <input type="text" id="manualAuthorName" placeholder="Wpisz imię i kliknij +">
+                <button id="btnAddManual" title="Dodaj ręcznie">+</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Zwycięzcy -->
+    <div id="winnerModal" class="modal">
+        <div class="modal-content">
+            <h2>🎉 Mamy zwycięzcę! 🎉</h2>
+            <div id="winnerName" class="winner-display"></div>
+            <div class="modal-actions">
+                <button id="btnDeleteWinner" class="btn-danger">Usuń z listy</button>
+                <button id="btnKeepWinner" class="btn-success">Zostaw i zamknij</button>
+                <button id="btnDrawAgain" class="btn-warning">Losuj ponownie</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

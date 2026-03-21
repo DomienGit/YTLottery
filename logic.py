@@ -73,33 +73,34 @@ def get_video_id(url):
         return None
 
 def create_chat_connection(url):
-        try:
-            video_id = get_video_id(url)
-            chat = pytchat.create(video_id=video_id)
-            return chat
-        except:
-            return None
+        # try:
+        video_id = get_video_id(url)
+        chat = pytchat.create(video_id=video_id)
+        return chat, video_id
+        # except:
+        #     return None
 
 def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_listener_queue, from_listener_to_main_queue):
         """
         Funkcja nasłuchująca czat, działająca w osobnym procesie.
         Dodaje unikalnych autorów do authors_list.
         """
-        chat = create_chat_connection(video_url)
+        chat, video_id = create_chat_connection(video_url)
         if chat is None:
-            from_listener_to_main_queue.put({"success": False, "message": "Invalid video URL"})
+            from_listener_to_main_queue.put({"success": False, "message": f"Invalid video URL: {video_id}"})
             return None
         from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
 
         command = from_main_to_listener_queue.get()
         if command.get("command") == "shutdown":
             return 
-
-        while not stop_event.is_set() and chat.is_alive():
-            try:
-                for c in chat.get().sync_items():
-                    authors_manager.add_author(c.author.name)
-            except Exception as e:
-                # print(f"Błąd podczas pobierania komentarzy: {e}") # Usunięte drukowanie, aby nie zaśmiecać konsoli
-                pass # Można dodać logowanie błędu, jeśli jest to potrzebne
-            time.sleep(0.5) # Krótka pauza, aby nie przeciążać CPU
+        while True:
+            
+            while not stop_event.is_set() and chat.is_alive():
+                try:
+                    for c in chat.get().sync_items():
+                        authors_manager.add_author(c.author.name)
+                except Exception as e:
+                    # print(f"Błąd podczas pobierania komentarzy: {e}") # Usunięte drukowanie, aby nie zaśmiecać konsoli
+                    pass # Można dodać logowanie błędu, jeśli jest to potrzebne
+                time.sleep(0.5) # Krótka pauza, aby nie przeciążać CPU
