@@ -36,9 +36,7 @@ class AppManager:
         self.from_main_to_listener_queue = multiprocessing.Queue()  # Kolejka do komunikacji z procesem nasłuchującym
         self.from_listener_to_main_queue = multiprocessing.Queue()  # Kolejka do komunikacji z procesem nasłuchującym
 
-    def start_listener(self, video_url):
-        self.authors_manager.clear_authors()  # Resetujemy zarządzany zbiór
-        self.stop_event.clear()  # Resetujemy zdarzenie stop
+    def run_process(self, video_url):
         self.process = multiprocessing.Process(
              target=start_chat_listener, 
              args=(
@@ -50,15 +48,26 @@ class AppManager:
                   )
             )
         self.process.start()
+
+    def start_listener(self, video_url):
+        if self.process is not None and self.process.is_alive():
+            self.terminate_process() # Zakończ istniejący proces, jeśli jest aktywny
+        self.authors_manager.clear_authors()  # Resetujemy zarządzany zbiór
+        self.stop_event.clear()  # Resetujemy zdarzenie stop
+        self.run_process(video_url)
     
-    def stop_listener(self):
-        self.stop_event.set()  # Ustawiamy zdarzenie stop
+    def terminate_process(self):
         if self.process and self.process.is_alive():
-            self.from_main_to_listener_queue.put({"command": "shutdown"})
+            self.stop_fetching_authors()  # Ustawiamy zdarzenie stop, aby proces mógł się zamknąć
+            self.from_main_to_listener_queue.put({"status": "shutdown"})  # Wysyłamy sygnał do procesu, aby się zamknął
             self.process.join(timeout=3) # Dajemy mu czas na łagodne zamknięcie
         if self.process and self.process.is_alive(): # Sprawdzamy ponownie, czy nadal żyje
             self.process.terminate()  # Jeśli nie zamknął się łagodnie, wymuszamy zamknięcie
         self.process = None # Resetujemy referencję do procesu
+    
+    def stop_fetching_authors(self):
+        self.stop_event.set()  # Ustawiamy zdarzenie stop
+
 
 def get_video_id(url):
         """
@@ -73,29 +82,29 @@ def get_video_id(url):
         return None
 
 def create_chat_connection(url):
-        # try:
-        video_id = get_video_id(url)
-        chat = pytchat.create(video_id=video_id)
-        return chat, video_id
-        # except:
-        #     return None
+        try:
+            video_id = get_video_id(url)
+            chat = pytchat.create(video_id=video_id)
+            return chat
+        except:
+            return None
 
 def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_listener_queue, from_listener_to_main_queue):
         """
         Funkcja nasłuchująca czat, działająca w osobnym procesie.
         Dodaje unikalnych autorów do authors_list.
         """
-        chat, video_id = create_chat_connection(video_url)
+        chat = create_chat_connection(video_url)
         if chat is None:
-            from_listener_to_main_queue.put({"success": False, "message": f"Invalid video URL: {video_id}"})
+            from_listener_to_main_queue.put({"success": False, "message": f"Invalid video URL"})
             return None
         from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
 
-        command = from_main_to_listener_queue.get()
-        if command.get("command") == "shutdown":
-            return 
         while True:
-            
+            command = from_main_to_listener_queue.get()
+            if command.get("status") == "shutdown":
+                break
+            stop_event.clear()
             while not stop_event.is_set() and chat.is_alive():
                 try:
                     for c in chat.get().sync_items():

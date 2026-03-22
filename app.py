@@ -73,7 +73,7 @@ def start_listener():
 
 @app.post("/stop")
 def stop_listener():
-    app_manager.stop_listener()
+    app_manager.stop_fetching_authors()
     return {
         "success": True,
         "message": "Chat listener stopped"}
