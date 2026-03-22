@@ -25,9 +25,16 @@ const btnDeleteWinner = document.getElementById('btnDeleteWinner');
 const btnKeepWinner = document.getElementById('btnKeepWinner');
 const btnDrawAgain = document.getElementById('btnDrawAgain');
 
+// Nowe elementy dla modala potwierdzenia usunięcia
+const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+const authorToDeleteName = document.getElementById('authorToDeleteName');
+const btnConfirmDelete = document.getElementById('btnConfirmDelete');
+const btnCancelDelete = document.getElementById('btnCancelDelete');
+
 let pollingInterval = null;
 let currentWinner = null;
 let displayedAuthors = new Set();
+let deleteConfirmCallback = null; // Zapisujemy callback do wykonania po potwierdzeniu
 
 // Funkcja pomocnicza do zapytań API
 async function apiPost(endpoint, data = {}) {
@@ -84,6 +91,27 @@ function updateUIState(state) {
     }
 }
 
+// Funkcja do wyświetlania modala potwierdzenia usunięcia
+function showDeleteConfirmModal(message, callback) {
+    authorToDeleteName.innerText = message;
+    deleteConfirmCallback = callback;
+    deleteConfirmModal.style.display = 'flex';
+}
+
+// Obsługa przycisków modala potwierdzenia
+btnConfirmDelete.addEventListener('click', () => {
+    if (deleteConfirmCallback) {
+        deleteConfirmCallback();
+    }
+    deleteConfirmModal.style.display = 'none';
+    deleteConfirmCallback = null;
+});
+
+btnCancelDelete.addEventListener('click', () => {
+    deleteConfirmModal.style.display = 'none';
+    deleteConfirmCallback = null;
+});
+
 // Potwierdź URL
 btnConfirm.addEventListener('click', async () => {
     const url = videoUrlInput.value.trim();
@@ -138,12 +166,12 @@ btnAddManual.addEventListener('click', async () => {
 });
 
 // Wyczyść listę
-btnClear.addEventListener('click', async () => {
-    if (confirm('Czy na pewno chcesz wyczyścić listę autorów?')) {
+btnClear.addEventListener('click', () => {
+    showDeleteConfirmModal('całą listę autorów', async () => {
         await apiPost('/clear');
         updateAuthorsList([]);
         updateUIState('validated');
-    }
+    });
 });
 
 // Losowanie
@@ -193,7 +221,7 @@ function updateAuthorsList(authors) {
             div.className = 'author-item';
             div.innerHTML = `
                 <span>${author}</span>
-                <button class="btn-delete-small" title="Usuń autora">−</button>
+                <button class="btn-delete-small" title="Usuń autora"><i class="fas fa-trash-alt"></i></button>
             `;
             div.querySelector('.btn-delete-small').addEventListener('click', () => {
                 deleteSpecificAuthor(author);
@@ -215,7 +243,7 @@ function updateAuthorsList(authors) {
 }
 
 async function deleteSpecificAuthor(name) {
-    if (confirm(`Czy na pewno chcesz usunąć autora "${name}"?`)) {
+    showDeleteConfirmModal(`"${name}"`, async () => {
         const result = await apiPost('/delete', { name });
         if (result.success) {
             const response = await fetch(`${API_URL}/authors`);
@@ -223,7 +251,7 @@ async function deleteSpecificAuthor(name) {
             updateAuthorsList(data.message);
             if (!pollingInterval) updateUIState('stopped');
         }
-    }
+    });
 }
 
 // Modal
@@ -237,6 +265,8 @@ btnKeepWinner.addEventListener('click', () => {
 });
 
 btnDeleteWinner.addEventListener('click', async () => {
+    // Tutaj również można użyć showDeleteConfirmModal, ale dla spójności z oryginalnym zachowaniem
+    // winnerModal, który ma swój własny przycisk "Usuń z listy", pozostawię to bez dodatkowego potwierdzenia.
     const result = await apiPost('/delete', { name: currentWinner });
     if (result.success) {
         winnerModal.style.display = 'none';

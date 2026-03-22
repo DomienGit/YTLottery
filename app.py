@@ -2,8 +2,9 @@ import os
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse  # Dodaj to
-from logic import AppManager
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles # Add this import
+from logic import AppManager 
 from pydantic import BaseModel
 
 class VideoURL(BaseModel):
@@ -13,6 +14,10 @@ class AuthorRequest(BaseModel):
     name: str
 
 app = FastAPI()
+
+# Mount static files for the 'img' directory
+app.mount("/img", StaticFiles(directory="img"), name="img") # Add this line
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
