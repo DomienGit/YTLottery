@@ -48,7 +48,7 @@ def get_script():
 def get_authors():
     return {
         "success": True,
-        "message": list(app_manager.authors_manager.get_authors())}
+        "message": list(app_manager.authors_manager.get_authors().values())} # Zwracamy listę kluczy z dict, czyli nazw autorów
 
 @app.post("/apply-url")
 def apply_url(data: VideoURL):
@@ -93,7 +93,9 @@ def draw_winner():
     return {
         "success": True,
         "message": "Winner drawn",
-        "winner": winner}
+        "winner": winner["author"],
+        "img": winner["img"]
+        }
 
 @app.post("/delete")
 def delete_author(data: AuthorRequest):

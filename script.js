@@ -20,7 +20,7 @@ const manualAuthorName = document.getElementById('manualAuthorName');
 const btnAddManual = document.getElementById('btnAddManual');
 
 const winnerModal = document.getElementById('winnerModal');
-const winnerName = document.getElementById('winnerName');
+const slotMachineContainer = document.getElementById('slotMachineContainer'); // Nowy element
 const btnDeleteWinner = document.getElementById('btnDeleteWinner');
 const btnKeepWinner = document.getElementById('btnKeepWinner');
 const btnDrawAgain = document.getElementById('btnDrawAgain');
@@ -33,7 +33,7 @@ const btnCancelDelete = document.getElementById('btnCancelDelete');
 
 let pollingInterval = null;
 let currentWinner = null;
-let displayedAuthors = new Set();
+let displayedAuthors = new Map(); // Zmieniamy na Map do przechowywania obiektów autora {name, img}
 let deleteConfirmCallback = null; // Zapisujemy callback do wykonania po potwierdzeniu
 
 // Funkcja pomocnicza do zapytań API
@@ -124,6 +124,8 @@ btnConfirm.addEventListener('click', async () => {
         statusMessage.innerText = 'Link zatwierdzony!';
         statusMessage.style.color = 'var(--success)';
         updateUIState('validated');
+        // Po udanej walidacji, pobierz i zaktualizuj listę autorów
+        await fetchAuthorsAndUpdateList();
     } else {
         statusMessage.innerText = `Błąd: ${result.message}`;
         statusMessage.style.color = 'var(--danger)';
@@ -139,7 +141,7 @@ btnStart.addEventListener('click', async () => {
     }
 });
 
-// Stop pobierania
+// Stop pobierajnia
 btnStop.addEventListener('click', async () => {
     const result = await apiPost('/stop');
     if (result.success) {
@@ -156,9 +158,8 @@ btnAddManual.addEventListener('click', async () => {
     const result = await apiPost('/add-author', { name });
     if (result.success) {
         manualAuthorName.value = '';
-        const response = await fetch(`${API_URL}/authors`);
-        const data = await response.json();
-        updateAuthorsList(data.message);
+        // Po dodaniu ręcznym, pobierz i zaktualizuj listę autorów
+        await fetchAuthorsAndUpdateList();
         
         // Jeśli dodaliśmy pierwszego autora po stopie, pokaż przyciski
         if (!pollingInterval) updateUIState('stopped');
@@ -169,7 +170,7 @@ btnAddManual.addEventListener('click', async () => {
 btnClear.addEventListener('click', () => {
     showDeleteConfirmModal('całą listę autorów', async () => {
         await apiPost('/clear');
-        updateAuthorsList([]);
+        updateAuthorsList([]); // Przekazujemy pustą tablicę, aby wyczyścić widok
         updateUIState('validated');
     });
 });
@@ -178,23 +179,25 @@ btnClear.addEventListener('click', () => {
 btnDraw.addEventListener('click', async () => {
     const result = await apiPost('/draw');
     if (result.success) {
-        currentWinner = result.winner;
+        currentWinner = { name: result.winner, img: result.img }; // Obiekt zwycięzcy
         showWinner(currentWinner);
     }
 });
 
 // Polling
+async function fetchAuthorsAndUpdateList() {
+    try {
+        const response = await fetch(`${API_URL}/authors`);
+        const result = await response.json();
+        if (result.success) {
+            updateAuthorsList(result.message);
+        }
+    } catch (e) { console.error('Polling error:', e); }
+}
+
 function startPolling() {
     if (pollingInterval) return;
-    pollingInterval = setInterval(async () => {
-        try {
-            const response = await fetch(`${API_URL}/authors`);
-            const result = await response.json();
-            if (result.success) {
-                updateAuthorsList(result.message);
-            }
-        } catch (e) { console.error('Polling error:', e); }
-    }, 2000);
+    pollingInterval = setInterval(fetchAuthorsAndUpdateList, 2000);
 }
 
 function stopPolling() {
@@ -208,56 +211,134 @@ function updateAuthorsList(authors) {
     if (authors.length === 0) {
         authorList.innerHTML = '<div class="empty-state">Brak autorów na liście.</div>';
         displayedAuthors.clear();
+        // Po wyczyszczeniu, sprawdź stan przycisków
+        if (!pollingInterval) updateUIState('stopped');
         return;
     }
 
     const emptyState = authorList.querySelector('.empty-state');
     if (emptyState) emptyState.remove();
 
-    // Dodaj nowych
-    authors.forEach(author => {
-        if (!displayedAuthors.has(author)) {
+    const newAuthorsMap = new Map(authors.map(author => [author.author, author]));
+    
+    // Usuń z ekranu tych, których nie ma w nowych danych
+    for (const [authorName, authorItemDiv] of displayedAuthors.entries()) {
+        if (!newAuthorsMap.has(authorName)) {
+            authorItemDiv.remove();
+            displayedAuthors.delete(authorName);
+        }
+    }
+
+    // Dodaj nowych i zaktualizuj istniejących
+    authors.forEach(authorData => {
+        if (!displayedAuthors.has(authorData.author)) {
             const div = document.createElement('div');
             div.className = 'author-item';
+            div.dataset.authorName = authorData.author; // Używamy dataset do przechowywania nazwy
             div.innerHTML = `
-                <span>${author}</span>
+                <img src="${authorData.img || 'img/logomini.png'}" alt="${authorData.author}" class="author-avatar">
+                <span>${authorData.author}</span>
                 <button class="btn-delete-small" title="Usuń autora"><i class="fas fa-trash-alt"></i></button>
             `;
             div.querySelector('.btn-delete-small').addEventListener('click', () => {
-                deleteSpecificAuthor(author);
+                deleteSpecificAuthor(authorData.author);
             });
             authorList.insertBefore(div, authorList.firstChild);
-            displayedAuthors.add(author);
+            displayedAuthors.set(authorData.author, div); // Przechowujemy referencję do elementu DOM
         }
     });
 
-    // Usuń z ekranu tych, których nie ma w danych
-    const currentOnScreen = Array.from(authorList.querySelectorAll('.author-item'));
-    currentOnScreen.forEach(item => {
-        const name = item.querySelector('span').innerText;
-        if (!authors.includes(name)) {
-            item.remove();
-            displayedAuthors.delete(name);
-        }
-    });
+    // Po aktualizacji, sprawdź stan przycisków
+    if (!pollingInterval) updateUIState('stopped');
 }
 
 async function deleteSpecificAuthor(name) {
     showDeleteConfirmModal(`"${name}"`, async () => {
         const result = await apiPost('/delete', { name });
         if (result.success) {
-            const response = await fetch(`${API_URL}/authors`);
-            const data = await response.json();
-            updateAuthorsList(data.message);
+            await fetchAuthorsAndUpdateList(); // Odśwież listę po usunięciu
             if (!pollingInterval) updateUIState('stopped');
         }
     });
 }
 
 // Modal
-function showWinner(name) {
-    winnerName.innerText = name;
+async function showWinner({ name, img }) {
+    slotMachineContainer.innerHTML = ''; // Wyczyść poprzednie wyniki
     winnerModal.style.display = 'flex';
+
+    const allAuthors = Array.from(displayedAuthors.values()).map(div => {
+        return {
+            name: div.dataset.authorName,
+            img: div.querySelector('.author-avatar').src
+        };
+    });
+
+    if (allAuthors.length === 0) {
+        const noAuthorsMessage = document.createElement('div');
+        noAuthorsMessage.className = 'winner-display';
+        noAuthorsMessage.innerHTML = `<div>Brak autorów do losowania!</div>`;
+        slotMachineContainer.appendChild(noAuthorsMessage);
+        return;
+    }
+
+    // Shuffle authors and add winner at the end for smooth animation stop
+    let shuffledAuthors = [...allAuthors];
+    // Ensure the winner is in the list of available authors
+    const winnerExists = shuffledAuthors.some(author => author.name === name);
+    if (!winnerExists) {
+        shuffledAuthors.push({ name: name, img: img || 'img/logomini.png' });
+    }
+    
+    // Create a long track for spinning
+    const trackLength = 50; // How many items in the spinning track
+    let slotItemsData = [];
+    for (let i = 0; i < trackLength - 1; i++) {
+        slotItemsData.push(shuffledAuthors[i % shuffledAuthors.length]);
+    }
+    // Add the actual winner as the last item to stop on
+    slotItemsData.push({ name: name, img: img || 'img/logomini.png' });
+
+    const slotTrack = document.createElement('div');
+    slotTrack.className = 'slot-track';
+    slotMachineContainer.appendChild(slotTrack);
+
+    const ITEM_HEIGHT = 150; // Wysokość pojedynczego slotu, musi zgadzać się z CSS
+    
+    slotItemsData.forEach(authorData => {
+        const item = document.createElement('div');
+        item.className = 'slot-item';
+        item.innerHTML = `
+            <img src="${authorData.img || 'img/logomini.png'}" alt="${authorData.name}" class="author-avatar winner-avatar-small">
+            <span>${authorData.name}</span>
+        `;
+        slotTrack.appendChild(item);
+    });
+
+    // Calculate the position for the winner
+    const winnerIndex = slotItemsData.length - 1; // The winner is the last item
+    const targetY = -(winnerIndex * ITEM_HEIGHT); // Target position to show the winner
+
+    // GSAP animation
+    gsap.fromTo(slotTrack, 
+        { y: 0 }, 
+        {
+            y: targetY,
+            duration: 5, // Longer duration for more spins
+            ease: "power3.out", // Easing for a smooth stop
+            onComplete: () => {
+                // After animation, replace the slot machine with the final winner display
+                slotMachineContainer.innerHTML = '';
+                const finalWinnerDisplay = document.createElement('div');
+                finalWinnerDisplay.className = 'winner-display';
+                finalWinnerDisplay.innerHTML = `
+                    <img src="${img || 'img/logomini.png'}" alt="${name}" class="winner-avatar">
+                    <div>${name}</div>
+                `;
+                slotMachineContainer.appendChild(finalWinnerDisplay);
+            }
+        }
+    );
 }
 
 btnKeepWinner.addEventListener('click', () => {
@@ -265,14 +346,10 @@ btnKeepWinner.addEventListener('click', () => {
 });
 
 btnDeleteWinner.addEventListener('click', async () => {
-    // Tutaj również można użyć showDeleteConfirmModal, ale dla spójności z oryginalnym zachowaniem
-    // winnerModal, który ma swój własny przycisk "Usuń z listy", pozostawię to bez dodatkowego potwierdzenia.
-    const result = await apiPost('/delete', { name: currentWinner });
+    const result = await apiPost('/delete', { name: currentWinner.name }); // Używamy currentWinner.name
     if (result.success) {
         winnerModal.style.display = 'none';
-        const response = await fetch(`${API_URL}/authors`);
-        const data = await response.json();
-        updateAuthorsList(data.message);
+        await fetchAuthorsAndUpdateList(); // Odśwież listę po usunięciu
         if (!pollingInterval) updateUIState('stopped');
     }
 });

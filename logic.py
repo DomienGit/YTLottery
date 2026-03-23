@@ -7,25 +7,25 @@ import random
 
 class AuthorsManager:
     def __init__(self):
-        self.authors_set = multiprocessing.Manager().set()  # Zarządzany zbiór
+        self.authors_dict = multiprocessing.Manager().dict()  # Zarządzany zbiór
 
-    def add_author(self, author_name):
-        self.authors_set.add(author_name)
+    def add_author(self, author_name, author_img=None):
+        self.authors_dict[author_name] = {"author": author_name, "img": author_img}
     
     def delete_author(self, author_name):
-        if author_name in self.authors_set:
-            self.authors_set.remove(author_name)
-    
+        if author_name in self.authors_dict:
+            del self.authors_dict[author_name]
+
     def get_authors(self):
-        return set(self.authors_set)
+        return self.authors_dict
 
     def draw_winner(self):
-        if not self.authors_set:
+        if not self.authors_dict:
             return None
-        return random.choice(list(self.authors_set))
-    
+        return random.choice(list(self.authors_dict.values()))
+
     def clear_authors(self):
-        self.authors_set.clear()
+        self.authors_dict.clear()
 
 class AppManager:
     def __init__(self):
@@ -108,7 +108,7 @@ def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_lis
             while not stop_event.is_set() and chat.is_alive():
                 try:
                     for c in chat.get().sync_items():
-                        authors_manager.add_author(c.author.name)
+                        authors_manager.add_author(c.author.name, c.author.photoUrl)
                 except Exception as e:
                     # print(f"Błąd podczas pobierania komentarzy: {e}") # Usunięte drukowanie, aby nie zaśmiecać konsoli
                     pass # Można dodać logowanie błędu, jeśli jest to potrzebne
