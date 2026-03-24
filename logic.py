@@ -88,28 +88,39 @@ def create_chat_connection(url):
             return chat
         except:
             return None
+        
+def apply_url(url, from_main_to_listener_queue, from_listener_to_main_queue):
+        chat = create_chat_connection(url)
+        if chat is None:
+            from_listener_to_main_queue.put({"success": False, "message": f"Invalid video URL"})
+            return None
+        from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
+        return chat
 
 def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_listener_queue, from_listener_to_main_queue):
         """
         Funkcja nasłuchująca czat, działająca w osobnym procesie.
         Dodaje unikalnych autorów do authors_list.
         """
-        chat = create_chat_connection(video_url)
-        if chat is None:
-            from_listener_to_main_queue.put({"success": False, "message": f"Invalid video URL"})
-            return None
-        from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
-
+        chat = apply_url(video_url, from_main_to_listener_queue, from_listener_to_main_queue)
+        if not chat:
+            return  # Jeśli URL jest nieprawidłowy, kończymy funkcję
+        
         while True:
-            command = from_main_to_listener_queue.get()
-            if command.get("status") == "shutdown":
+            status = from_main_to_listener_queue.get()
+            if status.get("status") == "shutdown":
                 break
             stop_event.clear()
             while not stop_event.is_set() and chat.is_alive():
                 try:
                     for c in chat.get().sync_items():
-                        authors_manager.add_author(c.author.name, c.author.photoUrl)
+                        message = c.message
+                        keyword = status.get("keyword")
+                        if check_keyword_in_message(message, keyword):
+                            authors_manager.add_author(c.author.name, c.author.imageUrl)
                 except Exception as e:
-                    # print(f"Błąd podczas pobierania komentarzy: {e}") # Usunięte drukowanie, aby nie zaśmiecać konsoli
                     pass # Można dodać logowanie błędu, jeśli jest to potrzebne
                 time.sleep(0.5) # Krótka pauza, aby nie przeciążać CPU
+
+def check_keyword_in_message(message, keyword):
+    return not keyword or keyword.lower() in message.lower()

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YT Lottery - Czat na żywo</title>
+    <title>YT Lottery</title>
+    <link rel="icon" type="image/png" href="img/logomini.png">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -23,10 +24,20 @@
 
         <!-- KROK 2: Przyciski sterujące -->
         <section id="controlsPanel" class="controls hidden">
-            <button id="btnStart" class="btn-success">Uruchom pobieranie</button>
-            <button id="btnStop" class="btn-danger hidden">Stop</button>
-            <button id="btnDraw" class="btn-warning hidden">Losuj zwycięzcę</button>
-            <button id="btnClear" class="btn-outline hidden">Wyczyść listę</button>
+            <div class="controls-row">
+                <button id="btnStart" class="btn-success">Uruchom pobieranie</button>
+                <button id="btnStop" class="btn-danger hidden">Stop</button>
+                <button id="btnToggleKeyword" class="btn-outline"><i class="fas fa-key"></i>Słowo kluczowe</button>
+            </div>
+            
+            <div id="keywordSection" class="keyword-section hidden">
+                <input type="text" id="keywordInput" placeholder="Wpisz wymagane słowo kluczowe (opcjonalnie)...">
+            </div>
+
+            <div class="controls-row">
+                <button id="btnDraw" class="btn-warning hidden">Losuj zwycięzcę</button>
+                <button id="btnClear" class="btn-outline hidden">Resetuj</button>
+            </div>
         </section>
 
         <!-- KROK 2: Lista i dodawanie ręczne -->
@@ -51,11 +62,11 @@
     <!-- Modal Zwycięzcy -->
     <div id="winnerModal" class="modal">
         <div class="modal-content">
-            <h2>🎉 Mamy zwycięzcę! 🎉</h2>
+            <h2 id="winnerModalTitle">🎉 Losowanie... 🎉</h2>
             <div id="slotMachineContainer" class="slot-machine-container">
                 <div class="slot-track"></div>
             </div>
-            <div class="modal-actions">
+            <div id="winnerModalActions" class="modal-actions hidden">
                 <button id="btnDeleteWinner" class="btn-danger">Usuń z listy</button>
                 <button id="btnKeepWinner" class="btn-success">Zostaw i zamknij</button>
                 <button id="btnDrawAgain" class="btn-warning">Losuj ponownie</button>
@@ -76,6 +87,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

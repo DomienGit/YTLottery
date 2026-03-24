@@ -12,6 +12,10 @@ const btnStop = document.getElementById('btnStop');
 const btnDraw = document.getElementById('btnDraw');
 const btnClear = document.getElementById('btnClear');
 
+const btnToggleKeyword = document.getElementById('btnToggleKeyword');
+const keywordSection = document.getElementById('keywordSection');
+const keywordInput = document.getElementById('keywordInput');
+
 const authorList = document.getElementById('authorList');
 const authorCount = document.getElementById('authorCount');
 const statusMessage = document.getElementById('statusMessage');
@@ -20,7 +24,9 @@ const manualAuthorName = document.getElementById('manualAuthorName');
 const btnAddManual = document.getElementById('btnAddManual');
 
 const winnerModal = document.getElementById('winnerModal');
-const slotMachineContainer = document.getElementById('slotMachineContainer'); // Nowy element
+const winnerModalTitle = document.getElementById('winnerModalTitle');
+const winnerModalActions = document.getElementById('winnerModalActions');
+const slotMachineContainer = document.getElementById('slotMachineContainer');
 const btnDeleteWinner = document.getElementById('btnDeleteWinner');
 const btnKeepWinner = document.getElementById('btnKeepWinner');
 const btnDrawAgain = document.getElementById('btnDrawAgain');
@@ -115,29 +121,76 @@ btnCancelDelete.addEventListener('click', () => {
 // Potwierdź URL
 btnConfirm.addEventListener('click', async () => {
     const url = videoUrlInput.value.trim();
-    if (!url) return;
+    if (!url) {
+        gsap.to(videoUrlInput, { x: 10, duration: 0.1, repeat: 3, yoyo: true });
+        return;
+    }
 
     statusMessage.innerText = 'Walidacja linku...';
+    gsap.to(statusMessage, { opacity: 0.5, duration: 0.5, repeat: -1, yoyo: true });
+    
     const result = await apiPost('/apply-url', { url });
 
+    gsap.killTweensOf(statusMessage);
+    gsap.set(statusMessage, { opacity: 1 });
+
     if (result.success) {
+        // Efekt sukcesu na przycisku
+        btnConfirm.classList.add('btn-confirm-success');
+        btnConfirm.innerHTML = '<i class="fas fa-check"></i>';
+        
         statusMessage.innerText = 'Link zatwierdzony!';
         statusMessage.style.color = 'var(--success)';
-        updateUIState('validated');
+        
+        // Animacja przejścia interfejsu
+        const tl = gsap.timeline();
+        tl.to(btnConfirm, { scale: 1.2, duration: 0.2 })
+          .to(btnConfirm, { scale: 1, duration: 0.2 })
+          .fromTo([controlsPanel, mainContent], 
+            { opacity: 0, y: 20 }, 
+            { opacity: 1, y: 0, duration: 0.5, stagger: 0.2, delay: 0.3, onStart: () => {
+                updateUIState('validated');
+            }});
+
         // Po udanej walidacji, pobierz i zaktualizuj listę autorów
         await fetchAuthorsAndUpdateList();
     } else {
         statusMessage.innerText = `Błąd: ${result.message}`;
         statusMessage.style.color = 'var(--danger)';
+        gsap.to(urlPanel, { x: 10, duration: 0.1, repeat: 3, yoyo: true });
     }
 });
 
-// Start pobierania
+// Resetowanie przycisku przy edycji linku
+videoUrlInput.addEventListener('input', () => {
+    if (btnConfirm.classList.contains('btn-confirm-success')) {
+        btnConfirm.classList.remove('btn-confirm-success');
+        btnConfirm.innerHTML = 'Potwierdź';
+        statusMessage.innerText = '';
+        
+        // Czyścimy ewentualne style inline, aby przycisk wrócił do 100% pierwotnego wyglądu
+        gsap.set(btnConfirm, { clearProps: "all" });
+    }
+});
+
+// Przełączanie sekcji słowa kluczowego - przycisk zamienia się w pole tekstowe
+btnToggleKeyword.addEventListener('click', () => {
+    keywordSection.classList.remove('hidden');
+    btnToggleKeyword.classList.add('hidden');
+    keywordInput.focus();
+});
+
+// Start pobierania - ukrywa opcje słowa kluczowego
 btnStart.addEventListener('click', async () => {
-    const result = await apiPost('/start');
+    const keyword = keywordInput.value.trim();
+    const result = await apiPost('/start', { keyword: keyword });
     if (result.success) {
         updateUIState('running');
         startPolling();
+        
+        // Ukrywamy wszystko co związane ze słowem kluczowym na czas pobierania
+        keywordSection.classList.add('hidden');
+        btnToggleKeyword.classList.add('hidden');
     }
 });
 
@@ -166,12 +219,17 @@ btnAddManual.addEventListener('click', async () => {
     }
 });
 
-// Wyczyść listę
+// Wyczyść listę - przywraca możliwość ustawienia słowa kluczowego
 btnClear.addEventListener('click', () => {
     showDeleteConfirmModal('całą listę autorów', async () => {
         await apiPost('/clear');
         updateAuthorsList([]); // Przekazujemy pustą tablicę, aby wyczyścić widok
         updateUIState('validated');
+        
+        // Przywracamy przycisk słowa kluczowego i czyścimy input
+        btnToggleKeyword.classList.remove('hidden');
+        keywordSection.classList.add('hidden');
+        keywordInput.value = '';
     });
 });
 
@@ -265,6 +323,8 @@ async function deleteSpecificAuthor(name) {
 // Modal
 async function showWinner({ name, img }) {
     slotMachineContainer.innerHTML = ''; // Wyczyść poprzednie wyniki
+    winnerModalTitle.innerText = '🎉 Losowanie... 🎉';
+    winnerModalActions.classList.add('hidden'); // Schowaj przyciski
     winnerModal.style.display = 'flex';
 
     const allAuthors = Array.from(displayedAuthors.values()).map(div => {
@@ -279,6 +339,7 @@ async function showWinner({ name, img }) {
         noAuthorsMessage.className = 'winner-display';
         noAuthorsMessage.innerHTML = `<div>Brak autorów do losowania!</div>`;
         slotMachineContainer.appendChild(noAuthorsMessage);
+        winnerModalActions.classList.remove('hidden');
         return;
     }
 
@@ -303,7 +364,7 @@ async function showWinner({ name, img }) {
     slotTrack.className = 'slot-track';
     slotMachineContainer.appendChild(slotTrack);
 
-    const ITEM_HEIGHT = 150; // Wysokość pojedynczego slotu, musi zgadzać się z CSS
+    const ITEM_HEIGHT = 200; // Wysokość pojedynczego slotu, musi zgadzać się z CSS
     
     slotItemsData.forEach(authorData => {
         const item = document.createElement('div');
@@ -336,6 +397,18 @@ async function showWinner({ name, img }) {
                     <div>${name}</div>
                 `;
                 slotMachineContainer.appendChild(finalWinnerDisplay);
+                
+                // Zaktualizuj UI po zakończeniu
+                winnerModalTitle.innerText = '✨ Gratulacje! ✨';
+                winnerModalActions.classList.remove('hidden'); // Pokaż przyciski
+                
+                // Konfetti!
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    zIndex: 2000
+                });
             }
         }
     );

@@ -55,6 +55,7 @@ body {
 .input-group {
     display: flex;
     gap: 12px;
+    align-items: center; /* Wyśrodkowanie w pionie dla transformującego się przycisku */
 }
 
 input[type="text"] {
@@ -79,8 +80,13 @@ button {
     padding: 14px 24px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     font-size: 0.9rem;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 .btn-primary { background: var(--accent); color: white; }
@@ -88,6 +94,17 @@ button {
 .btn-danger { background: var(--danger); color: white; }
 .btn-warning { background: var(--warning); color: #1e1e1e; }
 .btn-outline { background: transparent; border: 1px solid #3a3a3a; color: white; }
+
+/* Styl dla przycisku sukcesu (kółko) */
+.btn-confirm-success {
+    background: var(--success) !important;
+    width: 48px !important;
+    height: 48px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    color: white !important;
+    font-size: 1.2rem !important;
+}
 
 .status-message {
     margin-top: 12px;
@@ -97,9 +114,35 @@ button {
 
 .controls {
     display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+}
+
+.controls-row {
+    display: flex;
     flex-wrap: wrap;
     gap: 12px;
     justify-content: center;
+}
+
+.keyword-section {
+    width: 100%;
+    max-width: 400px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.keyword-section input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed #444;
+    padding: 10px 15px;
+    font-size: 0.9rem;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .stats {
@@ -108,7 +151,7 @@ button {
 }
 
 .author-list {
-    max-height: 350px;
+    max-height: 500px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -125,6 +168,7 @@ button {
     justify-content: space-between;
     align-items: center;
     transition: background 0.2s;
+    width: 100%;
 }
 
 .author-item:hover { background: #333333; }
@@ -141,11 +185,14 @@ button {
 /* Ręczne dodawanie jako element listy */
 .manual-add-item {
     background: #2a2a2a;
-    padding: 6px 6px 6px 18px;
+    padding: 8px 18px; /* Dopasowane dokładnie do author-item (18px horizontal) */
     border-radius: 8px;
     display: flex;
     align-items: center;
     border: 1px dashed #444;
+    width: calc(100% - 10px); /* Skompensowanie padding-right z author-list */
+    margin-top: 10px;
+    box-sizing: border-box;
 }
 
 .manual-add-item input {
@@ -153,6 +200,8 @@ button {
     border: none;
     padding: 8px 0;
     font-size: 0.95rem;
+    color: white;
+    flex-grow: 1;
 }
 
 .manual-add-item button {
@@ -162,10 +211,16 @@ button {
     height: 36px;
     padding: 0;
     border-radius: 6px;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-left: 10px;
+    transition: transform 0.2s;
+}
+
+.manual-add-item button:hover {
+    transform: scale(1.1);
 }
 
 .btn-delete-small {
@@ -206,7 +261,7 @@ button {
     padding: 40px;
     border-radius: 20px;
     text-align: center;
-    max-width: 500px;
+    max-width: 650px;
     width: 90%;
     border: 2px solid var(--warning);
 }
@@ -224,7 +279,7 @@ button {
 /* Slot Machine Styling */
 .slot-machine-container {
     width: 100%;
-    height: 150px; /* Wysokość dla jednego elementu + trochę marginesu */
+    height: 200px; /* Zwiększona wysokość */
     overflow: hidden;
     margin: 30px auto;
     border: 3px solid var(--warning);
@@ -246,7 +301,7 @@ button {
 
 .slot-item {
     width: 100%;
-    padding: 10px 0;
+    padding: 10px 15px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -254,9 +309,16 @@ button {
     font-weight: 800;
     color: var(--text-primary);
     box-sizing: border-box;
-    height: 150px; /* Wysokość pojedynczego slotu */
+    height: 200px; /* Dopasowane do kontenera */
     background: var(--card-bg);
     border-bottom: 1px solid #333;
+}
+
+.slot-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .slot-item:last-child {
@@ -269,12 +331,14 @@ button {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    padding: 20px;
+    padding: 15px;
+    height: 100%;
+    box-sizing: border-box;
 }
 
 .winner-avatar {
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     object-fit: cover;
     border: 4px solid var(--warning);
@@ -282,8 +346,11 @@ button {
 }
 
 .winner-display div {
-    font-size: 2.5rem;
+    font-size: 2.2rem;
     font-weight: 800;
     color: var(--warning);
     text-shadow: 0 0 10px rgba(241, 196, 15, 0.7);
+    word-break: break-word;
+    max-width: 100%;
+    line-height: 1.2;
 }

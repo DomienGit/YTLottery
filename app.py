@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles # Add this import
 from logic import AppManager 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class VideoURL(BaseModel):
     url: str
@@ -13,6 +13,8 @@ class VideoURL(BaseModel):
 class AuthorRequest(BaseModel):
     name: str
 
+class KeywordRequest(BaseModel):
+    keyword: str = Field(default="")
 app = FastAPI()
 
 # Mount static files for the 'img' directory
@@ -70,8 +72,9 @@ def apply_url(data: VideoURL):
         "url": video_url}   
 
 @app.post("/start")
-def start_listener():
-    app_manager.from_main_to_listener_queue.put({"status": "start"})
+def start_listener(data: KeywordRequest):
+    keyword = data.keyword
+    app_manager.from_main_to_listener_queue.put({"status": "start", "keyword": keyword})
     return {
         "success": True,
         "message": "Chat listener started"}
@@ -117,6 +120,7 @@ def clear_authors(data: dict = None): # Dodano dict, aby przyjąć {} z frontend
     return {
         "success": True,
         "message": "All authors cleared"}
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
