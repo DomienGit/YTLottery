@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:8000';
+const API_URL = '';
 
 // Elementy DOM
 const urlPanel = document.getElementById('urlPanel');
