@@ -71,10 +71,13 @@ class AppManager:
 
 def get_video_id(url):
         """
-        Wyciąga Video ID z różnych formatów linków YouTube.
-        Zwraca ID (11 znaków) lub None, jeśli link jest niepoprawny.
+        Wyciąga Video ID z różnych formatów linków YouTube:
+        - https://www.youtube.com/watch?v=VIDEO_ID
+        - https://youtu.be/VIDEO_ID
+        - https://www.youtube.com/live/VIDEO_ID
+        - https://youtube.com/shorts/VIDEO_ID
         """
-        pattern = r'(?:v=|\/)([0-9A-Za-z_-]{11})(?:[&?]|$)'
+        pattern = r'(?:v=|\/|shorts\/|live\/)([0-9A-Za-z_-]{11})(?:[&?]|$)'
         match = re.search(pattern, url)
 
         if match:
@@ -84,15 +87,24 @@ def get_video_id(url):
 def create_chat_connection(url):
         try:
             video_id = get_video_id(url)
+            if not video_id:
+                print(f"DEBUG: Could not extract video_id from {url}")
+                return None
             chat = pytchat.create(video_id=video_id)
             return chat
-        except:
+        except Exception as e:
+            print(f"DEBUG: Error creating chat connection: {e}")
             return None
         
 def apply_url(url, from_main_to_listener_queue, from_listener_to_main_queue):
+        video_id = get_video_id(url)
+        if not video_id:
+             from_listener_to_main_queue.put({"success": False, "message": "Niepoprawny format linku YouTube"})
+             return None
+
         chat = create_chat_connection(url)
         if chat is None:
-            from_listener_to_main_queue.put({"success": False, "message": f"Invalid video URL"})
+            from_listener_to_main_queue.put({"success": False, "message": "Błąd połączenia z czatem (IP zablokowane?)"})
             return None
         from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
         return chat
