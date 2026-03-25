@@ -132,7 +132,6 @@ def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_lis
                             authors_manager.add_author(c.author.name, c.author.imageUrl)
                 except Exception as e:
                     pass # Można dodać logowanie błędu, jeśli jest to potrzebne
-                time.sleep(0.5) # Krótka pauza, aby nie przeciążać CPU
 
 def check_keyword_in_message(message, keyword):
     return not keyword or keyword.lower() in message.lower()

@@ -255,7 +255,7 @@ async function fetchAuthorsAndUpdateList() {
 
 function startPolling() {
     if (pollingInterval) return;
-    pollingInterval = setInterval(fetchAuthorsAndUpdateList, 2000);
+    pollingInterval = setInterval(fetchAuthorsAndUpdateList, 1000);
 }
 
 function stopPolling() {
