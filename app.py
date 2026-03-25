@@ -32,6 +32,13 @@ def startup_event():
     global app_manager
     app_manager = AppManager()
 
+@app.on_event("shutdown")
+def shutdown_event():
+    if app_manager:
+        app_manager.terminate_process()  # Upewnij się, że proces nasłuchujący jest zakończony przy zamykaniu aplikacji
+    else:
+        pass
+
 @app.get("/")
 def read_root():
     return FileResponse("index.html")
