@@ -1,9 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles # Add this import
+from fastapi.staticfiles import StaticFiles
 from logic import AppManager 
 from pydantic import BaseModel, Field
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class VideoURL(BaseModel):
     url: str
@@ -15,8 +19,7 @@ class KeywordRequest(BaseModel):
     keyword: str = Field(default="")
 app = FastAPI()
 
-# Mount static files for the 'img' directory
-app.mount("/img", StaticFiles(directory="img"), name="img") # Add this line
+app.mount("/img", StaticFiles(directory="img"), name="img")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,6 +34,13 @@ app_manager: AppManager = None
 def startup_event():
     global app_manager
     app_manager = AppManager()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    if app_manager:
+        app_manager.terminate_process()
+    else:
+        pass
 
 @app.get("/")
 def read_root():
@@ -48,7 +58,8 @@ def get_script():
 def get_authors():
     return {
         "success": True,
-        "message": list(app_manager.authors_manager.get_authors().values())} # Zwracamy listę kluczy z dict, czyli nazw autorów
+        "message": list(app_manager.authors_manager.get_authors().values())
+        }
 
 @app.post("/apply-url")
 def apply_url(data: VideoURL):
@@ -58,7 +69,7 @@ def apply_url(data: VideoURL):
             "success": False,
             "message": "Type a video URL"}
     
-    app_manager.start_listener(video_url)
+    app_manager.start_chat_fetching_process(video_url)
     queue_response = app_manager.from_listener_to_main_queue.get()
     if not queue_response["success"]:
         return {
@@ -113,7 +124,7 @@ def add_author(data: AuthorRequest):
         "message": f"Author '{data.name}' added"}
 
 @app.post("/clear")
-def clear_authors(data: dict = None): # Dodano dict, aby przyjąć {} z frontendu
+def clear_authors(data: dict = None):
     app_manager.authors_manager.clear_authors()
     return {
         "success": True,

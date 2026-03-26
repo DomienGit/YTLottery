@@ -49,7 +49,7 @@ class AppManager:
             )
         self.process.start()
 
-    def start_listener(self, video_url):
+    def start_chat_fetching_process(self, video_url):
         if self.process is not None and self.process.is_alive():
             self.terminate_process() # Zakończ istniejący proces, jeśli jest aktywny
         self.authors_manager.clear_authors()  # Resetujemy zarządzany zbiór
