@@ -6,8 +6,8 @@ import random
 
 
 class AuthorsManager:
-    def __init__(self):
-        self.authors_dict = multiprocessing.Manager().dict()  # Zarządzany zbiór
+    def __init__(self, authors_dict):
+        self.authors_dict = authors_dict if authors_dict is not None else {}  # Zarządzany zbiór
 
     def add_author(self, author_name, author_img=None):
         self.authors_dict[author_name] = {"author": author_name, "img": author_img}
@@ -96,7 +96,7 @@ def create_chat_connection(url):
             print(f"DEBUG: Error creating chat connection: {e}")
             return None
         
-def apply_url(url, from_main_to_listener_queue, from_listener_to_main_queue):
+def apply_url(url, from_listener_to_main_queue):
         video_id = get_video_id(url)
         if not video_id:
              from_listener_to_main_queue.put({"success": False, "message": "Niepoprawny format linku YouTube"})
