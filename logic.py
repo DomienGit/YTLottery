@@ -5,7 +5,7 @@ import random
 
 
 class AuthorsManager:
-    def __init__(self, authors_dict):
+    def __init__(self, authors_dict=None):
         self.authors_dict = authors_dict if authors_dict is not None else {}  # Zarządzany zbiór
 
     def add_author(self, author_name, author_img=None):
@@ -28,7 +28,7 @@ class AuthorsManager:
 
 class AppManager:
     def __init__(self):
-        self.authors_manager = AuthorsManager()
+        self.authors_manager = AuthorsManager(multiprocessing.Manager().dict())
         self.stop_event = multiprocessing.Event()
         self.process = None
         self.fetching = False
@@ -99,41 +99,46 @@ def is_vaild_video_url(url):
     video_id = get_video_id(url)     
     return None if not video_id else video_id
 
+
 def apply_url(url, from_listener_to_main_queue):
-        if not is_vaild_video_url:
+        if not is_vaild_video_url(url):
              from_listener_to_main_queue.put({"success": False, "message": "Niepoprawny format linku YouTube"})
              return None
 
         chat = create_chat_connection(url)
         if chat is None:
             from_listener_to_main_queue.put({"success": False, "message": "Błąd połączenia z czatem (IP zablokowane?)"})
-            return None
-        from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
+        else:
+            from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
         return chat
+
+def process_chat_messages(chat, stop_event, authors_manager, from_main_to_listener_queue):
+    while True:
+        status = from_main_to_listener_queue.get()
+        if status.get("status") == "shutdown":
+            break
+        stop_event.clear()
+        fetch_and_filter_messages(chat, status.get("keyword"), stop_event, authors_manager)
+
+def fetch_and_filter_messages(chat, keyword, stop_event, authors_manager):
+    while not stop_event.is_set() and chat.is_alive():
+        try:
+            for c in chat.get().sync_items():
+                if check_keyword_in_message(c.message, keyword):
+                    authors_manager.add_author(c.author.name, c.author.imageUrl)
+        except Exception as e:
+            pass 
+
+def check_keyword_in_message(message, keyword):
+    return not keyword or keyword.lower() in message.lower()
 
 def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_listener_queue, from_listener_to_main_queue):
         """
         Funkcja nasłuchująca czat, działająca w osobnym procesie.
         Dodaje unikalnych autorów do authors_list.
         """
-        chat = apply_url(video_url, from_main_to_listener_queue, from_listener_to_main_queue)
+        chat = apply_url(video_url, from_listener_to_main_queue)
         if not chat:
             return  # Jeśli URL jest nieprawidłowy, kończymy funkcję
         
-        while True:
-            status = from_main_to_listener_queue.get()
-            if status.get("status") == "shutdown":
-                break
-            stop_event.clear()
-            while not stop_event.is_set() and chat.is_alive():
-                try:
-                    for c in chat.get().sync_items():
-                        message = c.message
-                        keyword = status.get("keyword")
-                        if check_keyword_in_message(message, keyword):
-                            authors_manager.add_author(c.author.name, c.author.imageUrl)
-                except Exception as e:
-                    pass # Można dodać logowanie błędu, jeśli jest to potrzebne
-
-def check_keyword_in_message(message, keyword):
-    return not keyword or keyword.lower() in message.lower()
+        process_chat_messages(chat, stop_event, authors_manager, from_main_to_listener_queue)
