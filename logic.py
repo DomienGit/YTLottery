@@ -27,13 +27,17 @@ class AuthorsManager:
         self.authors_dict.clear()
 
 class AppManager:
-    def __init__(self):
-        self.authors_manager = AuthorsManager(multiprocessing.Manager().dict())
-        self.stop_event = multiprocessing.Event()
+    def __init__(self, 
+                 authors_manager=None, 
+                 stop_event=None, 
+                 from_main_to_listener_queue=None, 
+                 from_listener_to_main_queue=None):
+        self.authors_manager = authors_manager or AuthorsManager(multiprocessing.Manager().dict())
+        self.stop_event = stop_event or multiprocessing.Event()
         self.process = None
         self.fetching = False
-        self.from_main_to_listener_queue = multiprocessing.Queue()  # Kolejka do komunikacji z procesem nasłuchującym
-        self.from_listener_to_main_queue = multiprocessing.Queue()  # Kolejka do komunikacji z procesem nasłuchującym
+        self.from_main_to_listener_queue = from_main_to_listener_queue or multiprocessing.Queue()
+        self.from_listener_to_main_queue = from_listener_to_main_queue or multiprocessing.Queue()
 
     def run_process(self, video_url):
         self.process = multiprocessing.Process(
