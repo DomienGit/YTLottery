@@ -1,5 +1,4 @@
-from fastapi import FastAPI
-from multiprocessing import Manager
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,6 +30,9 @@ app.add_middleware(
 )
 app_manager: AppManager = None
 
+def get_app_manager():
+    return app_manager
+
 @app.on_event("startup")
 def startup_event():
     global app_manager
@@ -56,14 +58,14 @@ def get_script():
     return FileResponse("script.js")
 
 @app.get("/authors")
-def get_authors():
+def get_authors(app_manager: AppManager = Depends(get_app_manager)):
     return {
         "success": True,
         "message": list(app_manager.authors_manager.get_authors().values())
         }
 
 @app.post("/apply-url")
-def apply_url(data: VideoURL):
+def apply_url(data: VideoURL, app_manager: AppManager = Depends(get_app_manager)):
     video_url = data.url
     if not video_url:
         return {
@@ -82,7 +84,7 @@ def apply_url(data: VideoURL):
         "url": video_url}   
 
 @app.post("/start")
-def start_listener(data: KeywordRequest):
+def start_listener(data: KeywordRequest, app_manager: AppManager = Depends(get_app_manager)):
     keyword = data.keyword
     app_manager.from_main_to_listener_queue.put({"status": "start", "keyword": keyword})
     return {
@@ -90,14 +92,14 @@ def start_listener(data: KeywordRequest):
         "message": "Chat listener started"}
 
 @app.post("/stop")
-def stop_listener():
+def stop_listener(app_manager: AppManager = Depends(get_app_manager)):
     app_manager.stop_fetching_authors()
     return {
         "success": True,
         "message": "Chat listener stopped"}
 
 @app.post("/draw")
-def draw_winner():
+def draw_winner(app_manager: AppManager = Depends(get_app_manager)):
     winner = app_manager.authors_manager.draw_winner()
     if winner is None:
         return {
@@ -111,21 +113,21 @@ def draw_winner():
         }
 
 @app.post("/delete")
-def delete_author(data: AuthorRequest):
+def delete_author(data: AuthorRequest, app_manager: AppManager = Depends(get_app_manager)):
     app_manager.authors_manager.delete_author(data.name)
     return {
         "success": True,
         "message": f"Author '{data.name}' deleted"}
 
 @app.post("/add-author")
-def add_author(data: AuthorRequest):
+def add_author(data: AuthorRequest, app_manager: AppManager = Depends(get_app_manager)):
     app_manager.authors_manager.add_author(data.name)
     return {
         "success": True,
         "message": f"Author '{data.name}' added"}
 
 @app.post("/clear")
-def clear_authors(data: dict = None):
+def clear_authors(app_manager: AppManager = Depends(get_app_manager)):
     app_manager.authors_manager.clear_authors()
     return {
         "success": True,

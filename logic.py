@@ -99,13 +99,13 @@ def create_chat_connection(url):
             print(f"DEBUG: Error creating chat connection: {e}")
             return None
         
-def is_vaild_video_url(url):
+def is_valid_video_url(url):
     video_id = get_video_id(url)     
     return None if not video_id else video_id
 
 
 def apply_url(url, from_listener_to_main_queue):
-        if not is_vaild_video_url(url):
+        if not is_valid_video_url(url):
              from_listener_to_main_queue.put({"success": False, "message": "Niepoprawny format linku YouTube"})
              return None
 
