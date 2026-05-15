@@ -41,10 +41,22 @@ def test_add_author(authors):
     assert authors.get_authors()["Alice"]["author"] == "Alice"
     assert "NotIn" not in authors.get_authors()
 
+def test_add_existing_author(authors):
+    authors.add_author("Alice", "http://example.com/alice.jpg")
+    authors.add_author("Alice", "http://example.com/alice.jpg")
+    assert len(authors.get_authors()) == 1
+
 def test_delete_author(authors):
     authors.add_author("Alice", "http://example.com/alice.jpg")
     authors.delete_author("Alice")
     assert "Alice" not in authors.get_authors()
+
+def test_delete_non_existent_author(authors):
+    authors.add_author("Alice", "http://example.com/alice.jpg")
+    authors.delete_author("Bob")
+    assert "Alice" in authors.get_authors()
+    assert len(authors.get_authors()) == 1
+
 
 def test_draw_winner_returned_winner(authors):
     authors.add_author("Alice", "http://example.com/alice.jpg")
