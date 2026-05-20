@@ -106,12 +106,12 @@ def is_valid_video_url(url):
 
 def apply_url(url, from_listener_to_main_queue):
         if not is_valid_video_url(url):
-             from_listener_to_main_queue.put({"success": False, "message": "Niepoprawny format linku YouTube"})
+             from_listener_to_main_queue.put({"success": False, "message": "Invalid video URL"})
              return None
 
         chat = create_chat_connection(url)
         if chat is None:
-            from_listener_to_main_queue.put({"success": False, "message": "Błąd połączenia z czatem (IP zablokowane?)"})
+            from_listener_to_main_queue.put({"success": False, "message": "Error connecting to chat (IP blocked?)"})
         else:
             from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
         return chat
