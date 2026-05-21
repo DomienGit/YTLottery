@@ -29,12 +29,6 @@ def test_get_video_id(url, expected):
 def test_check_keyword_in_message(message, keyword, expected):
     assert check_keyword_in_message(message, keyword) == expected
 
-@pytest.fixture
-def authors():
-    authors_manager = AuthorsManager()
-    yield authors_manager
-    authors_manager.clear_authors()
-
 def test_add_author(authors):
     authors.add_author("Alice", "http://example.com/alice.jpg")
     assert "Alice" in authors.get_authors()
