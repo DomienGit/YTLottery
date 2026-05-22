@@ -45,3 +45,6 @@ def test_draw_flow(integration_client):
     assert response.json()["winner"] in authors
     assert response.json()["success"] == True
     assert response.json()["message"] == "Winner drawn"
+
+''' 3. Flow czyszczenia — dodaj autorów → POST /clear → sprawdź pustą listę → POST /draw powinien zwrócić błąd
+   #4. Pełny cykl — dodaj autorów → wylosuj → usuń zwyciężcę → dodaj nowego → wylosuj ponownie → wyczyść wszystko → draw powinien zwrócić błąd'''
