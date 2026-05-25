@@ -9,3 +9,5 @@ dependencies = [
     "pytchat",
     "uvicorn",
 ]
+[tool.pytest.ini_options]                                                                                                                                   
+  pythonpath = ["."]       
