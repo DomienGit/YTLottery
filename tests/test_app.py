@@ -51,7 +51,7 @@ def test_draw_winner_with_authors(client, mock_app_manager):
     data = response.json()
     assert data["success"] == True
     assert data["message"] == "Winner drawn"
-    assert data["winner"] not in ["Alice", "Bob"]
+    assert data["winner"] in ["Alice", "Bob"]
     assert data["img"] in ["http://example.com/author1", "http://example.com/author2"]
 
 def test_draw_winner_no_authors(client):
