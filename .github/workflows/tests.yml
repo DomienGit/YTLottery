@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-latest
 
@@ -27,3 +27,18 @@ jobs:
     - name: Test with pytest
       run: |
         pytest
+  deploy:
+      needs: test                                                                      
+      if: github.ref == 'refs/heads/main'
+      runs-on: ubuntu-latest
+      steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/ytlottery
+            git pull origin main
+            sudo systemctl restart ytlottery

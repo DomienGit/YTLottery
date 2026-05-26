@@ -1,0 +1,105 @@
+Plan wdrożenia CD (automatyczny deploy na VPS po przejściu testów)
+
+=== PRZYGOTOWANIE VPS ===
+
+KROK 1 — Skonfiguruj systemd service
+  Teraz odpalasz uvicorn ręcznie. Jak zamkniesz terminal — apka padnie.
+  Systemd utrzyma aplikację przy życiu, zrestartuje ją jak padnie, i pozwoli
+  łatwo restartować z GitHub Actions.
+
+  Na VPS stwórz plik: /etc/systemd/system/ytlottery.service
+
+  Zawartość:
+  [Unit]
+  Description=YTLottery
+  After=network.target
+
+  [Service]
+  User=TWOJ_USER
+  WorkingDirectory=/ścieżka/do/YTLottery
+  ExecStart=/ścieżka/do/YTLottery/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000
+  Restart=always
+
+  [Install]
+  WantedBy=multi-user.target
+
+  Potem na VPS:
+  - sudo systemctl daemon-reload
+  - sudo systemctl enable ytlottery    (startuje przy boot)
+  - sudo systemctl start ytlottery     (odpala teraz)
+
+  Od teraz zarządzasz aplikacją:
+  - sudo systemctl restart ytlottery   (restart)
+  - sudo systemctl status ytlottery    (status)
+  - journalctl -u ytlottery -f         (logi na żywo)
+
+
+KROK 2 — Wygeneruj klucz SSH dla GitHub Actions
+  GitHub Actions musi mieć dostęp SSH do twojego VPS.
+  Nie używaj swojego klucza — stwórz dedykowany.
+
+  Na swoim komputerze (nie na VPS):
+  - ssh-keygen -t ed25519 -C "github-actions" -f github-actions-key
+  - To tworzy dwa pliki:
+    github-actions-key      (klucz prywatny — idzie do GitHub Secrets)
+    github-actions-key.pub  (klucz publiczny — idzie na VPS)
+
+  Na VPS:
+  - Dodaj zawartość github-actions-key.pub do ~/.ssh/authorized_keys
+  - Możesz to zrobić ręcznie lub: echo "ZAWARTOŚĆ_KLUCZA_PUBLICZNEGO" >> ~/.ssh/authorized_keys
+
+  Na GitHubie:
+  - Wejdź w repozytorium -> Settings -> Secrets and variables -> Actions
+  - Dodaj secret: VPS_SSH_KEY = zawartość pliku github-actions-key (prywatny!)
+  - Dodaj secret: VPS_USER = twój username na VPS
+  - Dodaj secret: VPS_HOST = IP twojego VPS
+
+
+KROK 3 — Dodaj deploy job do workflow
+  W pliku .github/workflows/tests.yml dodaj nowy job "deploy",
+  który odpala się TYLKO jeśli testy przeszły i TYLKO na branchu main.
+
+  Struktura:
+  jobs:
+    test:          <-- obecny job "build", zmień nazwę na "test"
+      ...
+    deploy:
+      needs: test            <-- czeka na testy
+      if: github.ref == 'refs/heads/main'  <-- tylko main, nie PR
+      runs-on: ubuntu-latest
+      steps:
+        - SSH do VPS
+        - git pull
+        - sudo systemctl restart ytlottery
+
+  Do SSH użyj appleboy/ssh-action — to gotowa akcja która loguje się
+  przez SSH używając klucza z GitHub Secrets.
+
+  Przykład:
+  - name: Deploy to VPS
+    uses: appleboy/ssh-action@v1
+    with:
+      host: ${{ secrets.VPS_HOST }}
+      username: ${{ secrets.VPS_USER }}
+      key: ${{ secrets.VPS_SSH_KEY }}
+      script: |
+        cd /ścieżka/do/YTLottery
+        git pull origin main
+        sudo systemctl restart ytlottery
+
+
+=== WAŻNE UWAGI ===
+
+- Klucz PRYWATNY nigdy nie ląduje w kodzie — tylko w GitHub Secrets
+- GitHub Secrets są szyfrowane i nie da się ich odczytać po zapisaniu
+- Deploy odpala się tylko po pushu na main, nie przy PR
+- Jak testy nie przejdą — deploy się nie odpali (needs: test)
+- Upewnij się że sudo systemctl restart nie wymaga hasła dla twojego usera
+  (dodaj regułę w sudoers: TWOJ_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart ytlottery)
+
+=== KOLEJNOŚĆ DZIAŁANIA ===
+1. Skonfiguruj systemd na VPS (krok 1)
+2. Wygeneruj klucz SSH (krok 2)
+3. Dodaj secrets na GitHubie (krok 2)
+4. Zmień workflow (krok 3)
+5. Push i sprawdź w Actions czy deploy zadziałał
