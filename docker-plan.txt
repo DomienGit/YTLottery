@@ -1,0 +1,105 @@
+Plan wdrożenia Dockera
+
+=== KROK 1 — Zainstaluj Docker na VPS ===
+
+Na VPS:
+  curl -fsSL https://get.docker.com -o get-docker.sh
+  sudo sh get-docker.sh
+  sudo usermod -aG docker root    (albo twój user)
+  docker --version                 (sprawdź czy działa)
+
+=== KROK 2 — Stwórz Dockerfile w projekcie ===
+
+Plik: Dockerfile (w katalogu głównym projektu)
+
+  FROM python:3.13-slim
+  WORKDIR /app
+  COPY requirements.txt .
+  RUN pip install --no-cache-dir -r requirements.txt
+  COPY . .
+  EXPOSE 8000
+  CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+Co to robi:
+  - FROM — bazowy obraz, czysty Linux z Pythonem 3.13
+  - WORKDIR — katalog roboczy wewnątrz kontenera
+  - COPY requirements.txt + RUN pip install — najpierw same zależności
+    (Docker cache'uje warstwy — jak nie zmienisz requirements, nie instaluje ponownie)
+  - COPY . . — kopiujesz resztę kodu
+  - EXPOSE — informacja który port kontener wystawia
+  - CMD — komenda która się odpala przy starcie kontenera
+
+=== KROK 3 — Stwórz .dockerignore ===
+
+Plik: .dockerignore (w katalogu głównym projektu)
+
+  .venv/
+  .git/
+  __pycache__/
+  *.pyc
+  .github/
+  CI_CD.md
+  ci-plan.txt
+  cd-plan.txt
+  docker-plan.txt
+
+Żeby nie kopiować niepotrzebnych plików do kontenera.
+
+=== KROK 4 — Przetestuj lokalnie ===
+
+Zbuduj obraz:
+  docker build -t ytlottery .
+
+Odpal kontener:
+  docker run -d -p 8000:8000 --name ytlottery ytlottery
+
+Sprawdź:
+  docker ps                          (czy działa)
+  curl http://localhost:8000          (czy odpowiada)
+
+Zatrzymaj:
+  docker stop ytlottery
+  docker rm ytlottery
+
+=== KROK 5 — Zmień serwis na VPS na Docker ===
+
+Zmień /etc/systemd/system/ytlottery.service:
+
+  [Unit]
+  Description=YTLottery (Docker)
+  After=docker.service
+  Requires=docker.service
+
+  [Service]
+  ExecStartPre=-/usr/bin/docker stop ytlottery
+  ExecStartPre=-/usr/bin/docker rm ytlottery
+  ExecStart=/usr/bin/docker run --name ytlottery -p 8000:8000 ytlottery:latest
+  ExecStop=/usr/bin/docker stop ytlottery
+  Restart=always
+  RestartSec=10
+
+  [Install]
+  WantedBy=multi-user.target
+
+Potem:
+  sudo systemctl daemon-reload
+  sudo systemctl restart ytlottery
+
+Nginx zostaje bez zmian — proxyuje na port 8000 tak jak wcześniej.
+
+=== KROK 6 — Zmień CD workflow ===
+
+W .github/workflows/tests.yml, w jobie deploy, zmień script na:
+
+  docker build -t ytlottery /opt/ytlottery
+  sudo systemctl restart ytlottery
+
+Build buduje nowy obraz z aktualnego kodu, restart odpala kontener na nowo.
+
+=== KOLEJNOŚĆ DZIAŁANIA ===
+1. Zainstaluj Docker na VPS (krok 1)
+2. Stwórz Dockerfile + .dockerignore w projekcie (kroki 2-3)
+3. Przetestuj lokalnie (krok 4)
+4. Zmień systemd service na VPS (krok 5)
+5. Zmień CD workflow (krok 6)
+6. Push i sprawdź czy deploy działa
