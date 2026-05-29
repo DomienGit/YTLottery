@@ -41,4 +41,5 @@ jobs:
           script: |
             cd /opt/ytlottery
             git pull origin main
+            docker build -t ytlottery .
             sudo systemctl restart ytlottery
