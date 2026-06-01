@@ -37,10 +37,73 @@ const authorToDeleteName = document.getElementById('authorToDeleteName');
 const btnConfirmDelete = document.getElementById('btnConfirmDelete');
 const btnCancelDelete = document.getElementById('btnCancelDelete');
 
-let pollingInterval = null;
 let currentWinner = null;
 let displayedAuthors = new Map(); // Zmieniamy na Map do przechowywania obiektów autora {name, img}
 let deleteConfirmCallback = null; // Zapisujemy callback do wykonania po potwierdzeniu
+
+// WebSocket
+let ws = null;
+let wsReconnectTimer = null;
+let pollingInterval = null;
+let usePollingFallback = false;
+
+function connectWebSocket() {
+    if (ws && ws.readyState === WebSocket.OPEN) return;
+
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${location.host}/ws`;
+
+    try {
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            usePollingFallback = false;
+            stopPolling();
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'authors_update') {
+                    updateAuthorsList(data.authors);
+                }
+            } catch (e) {
+                console.error('WebSocket message parse error:', e);
+            }
+        };
+
+        ws.onclose = () => {
+            ws = null;
+            // Auto-reconnect after 2 seconds
+            wsReconnectTimer = setTimeout(() => {
+                connectWebSocket();
+            }, 2000);
+        };
+
+        ws.onerror = () => {
+            // Fallback to polling if WebSocket fails
+            if (!usePollingFallback) {
+                usePollingFallback = true;
+                startPolling();
+            }
+        };
+    } catch (e) {
+        usePollingFallback = true;
+        startPolling();
+    }
+}
+
+function disconnectWebSocket() {
+    if (wsReconnectTimer) {
+        clearTimeout(wsReconnectTimer);
+        wsReconnectTimer = null;
+    }
+    if (ws) {
+        ws.onclose = null; // Prevent reconnect
+        ws.close();
+        ws = null;
+    }
+}
 
 // Funkcja pomocnicza do zapytań API
 async function apiPost(endpoint, data = {}) {
@@ -60,32 +123,32 @@ async function apiPost(endpoint, data = {}) {
 // Zarządzanie widocznością zgodnie z Twoimi krokami
 function updateUIState(state) {
     // state: 'init', 'validated', 'running', 'stopped'
-    
+
     switch(state) {
         case 'init':
             urlPanel.classList.remove('hidden');
             controlsPanel.classList.add('hidden');
             mainContent.classList.add('hidden');
             break;
-            
+
         case 'validated':
             urlPanel.classList.remove('hidden');
             controlsPanel.classList.remove('hidden');
             mainContent.classList.remove('hidden');
-            
+
             btnStart.classList.remove('hidden');
             btnStop.classList.add('hidden');
             btnDraw.classList.add('hidden');
             btnClear.classList.add('hidden');
             break;
-            
+
         case 'running':
             btnStart.classList.add('hidden');
             btnStop.classList.remove('hidden');
             btnDraw.classList.add('hidden');
             btnClear.classList.add('hidden');
             break;
-            
+
         case 'stopped':
             btnStart.classList.remove('hidden');
             btnStop.classList.add('hidden');
@@ -128,7 +191,7 @@ btnConfirm.addEventListener('click', async () => {
 
     statusMessage.innerText = 'Walidacja linku...';
     gsap.to(statusMessage, { opacity: 0.5, duration: 0.5, repeat: -1, yoyo: true });
-    
+
     const result = await apiPost('/apply-url', { url });
 
     gsap.killTweensOf(statusMessage);
@@ -138,22 +201,22 @@ btnConfirm.addEventListener('click', async () => {
         // Efekt sukcesu na przycisku
         btnConfirm.classList.add('btn-confirm-success');
         btnConfirm.innerHTML = '<i class="fas fa-check"></i>';
-        
+
         statusMessage.innerText = 'Link zatwierdzony!';
         statusMessage.style.color = 'var(--success)';
-        
+
         // Animacja przejścia interfejsu
         const tl = gsap.timeline();
         tl.to(btnConfirm, { scale: 1.2, duration: 0.2 })
           .to(btnConfirm, { scale: 1, duration: 0.2 })
-          .fromTo([controlsPanel, mainContent], 
-            { opacity: 0, y: 20 }, 
+          .fromTo([controlsPanel, mainContent],
+            { opacity: 0, y: 20 },
             { opacity: 1, y: 0, duration: 0.5, stagger: 0.2, delay: 0.3, onStart: () => {
                 updateUIState('validated');
             }});
 
-        // Po udanej walidacji, pobierz i zaktualizuj listę autorów
-        await fetchAuthorsAndUpdateList();
+        // Połączenie WebSocket po walidacji URL
+        connectWebSocket();
     } else {
         statusMessage.innerText = `Błąd: ${result.message}`;
         statusMessage.style.color = 'var(--danger)';
@@ -167,7 +230,7 @@ videoUrlInput.addEventListener('input', () => {
         btnConfirm.classList.remove('btn-confirm-success');
         btnConfirm.innerHTML = 'Potwierdź';
         statusMessage.innerText = '';
-        
+
         // Czyścimy ewentualne style inline, aby przycisk wrócił do 100% pierwotnego wyglądu
         gsap.set(btnConfirm, { clearProps: "all" });
     }
@@ -186,8 +249,7 @@ btnStart.addEventListener('click', async () => {
     const result = await apiPost('/start', { keyword: keyword });
     if (result.success) {
         updateUIState('running');
-        startPolling();
-        
+
         // Ukrywamy wszystko co związane ze słowem kluczowym na czas pobierania
         keywordSection.classList.add('hidden');
         btnToggleKeyword.classList.add('hidden');
@@ -199,7 +261,6 @@ btnStop.addEventListener('click', async () => {
     const result = await apiPost('/stop');
     if (result.success) {
         updateUIState('stopped');
-        stopPolling();
     }
 });
 
@@ -211,10 +272,10 @@ btnAddManual.addEventListener('click', async () => {
     const result = await apiPost('/add-author', { name });
     if (result.success) {
         manualAuthorName.value = '';
-        // Po dodaniu ręcznym, pobierz i zaktualizuj listę autorów
-        await fetchAuthorsAndUpdateList();
-        
-        // Jeśli dodaliśmy pierwszego autora po stopie, pokaż przyciski
+        // WebSocket załatwi aktualizację listy; fallback:
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            await fetchAuthorsAndUpdateList();
+        }
         if (!pollingInterval) updateUIState('stopped');
     }
 });
@@ -225,7 +286,7 @@ btnClear.addEventListener('click', () => {
         await apiPost('/clear');
         updateAuthorsList([]); // Przekazujemy pustą tablicę, aby wyczyścić widok
         updateUIState('validated');
-        
+
         // Przywracamy przycisk słowa kluczowego i czyścimy input
         btnToggleKeyword.classList.remove('hidden');
         keywordSection.classList.add('hidden');
@@ -242,7 +303,7 @@ btnDraw.addEventListener('click', async () => {
     }
 });
 
-// Polling
+// Polling (fallback)
 async function fetchAuthorsAndUpdateList() {
     try {
         const response = await fetch(`${API_URL}/authors`);
@@ -265,7 +326,7 @@ function stopPolling() {
 
 function updateAuthorsList(authors) {
     authorCount.innerText = authors.length;
-    
+
     if (authors.length === 0) {
         authorList.innerHTML = '<div class="empty-state">Brak autorów na liście.</div>';
         displayedAuthors.clear();
@@ -278,7 +339,7 @@ function updateAuthorsList(authors) {
     if (emptyState) emptyState.remove();
 
     const newAuthorsMap = new Map(authors.map(author => [author.author, author]));
-    
+
     // Usuń z ekranu tych, których nie ma w nowych danych
     for (const [authorName, authorItemDiv] of displayedAuthors.entries()) {
         if (!newAuthorsMap.has(authorName)) {
@@ -314,7 +375,10 @@ async function deleteSpecificAuthor(name) {
     showDeleteConfirmModal(`"${name}"`, async () => {
         const result = await apiPost('/delete', { name });
         if (result.success) {
-            await fetchAuthorsAndUpdateList(); // Odśwież listę po usunięciu
+            // WebSocket załatwi aktualizację listy; fallback:
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                await fetchAuthorsAndUpdateList();
+            }
             if (!pollingInterval) updateUIState('stopped');
         }
     });
@@ -350,7 +414,7 @@ async function showWinner({ name, img }) {
     if (!winnerExists) {
         shuffledAuthors.push({ name: name, img: img || 'img/logomini.png' });
     }
-    
+
     // Create a long track for spinning
     const trackLength = 50; // How many items in the spinning track
     let slotItemsData = [];
@@ -365,7 +429,7 @@ async function showWinner({ name, img }) {
     slotMachineContainer.appendChild(slotTrack);
 
     const ITEM_HEIGHT = 200; // Wysokość pojedynczego slotu, musi zgadzać się z CSS
-    
+
     slotItemsData.forEach(authorData => {
         const item = document.createElement('div');
         item.className = 'slot-item';
@@ -381,8 +445,8 @@ async function showWinner({ name, img }) {
     const targetY = -(winnerIndex * ITEM_HEIGHT); // Target position to show the winner
 
     // GSAP animation
-    gsap.fromTo(slotTrack, 
-        { y: 0 }, 
+    gsap.fromTo(slotTrack,
+        { y: 0 },
         {
             y: targetY,
             duration: 5, // Longer duration for more spins
@@ -397,11 +461,11 @@ async function showWinner({ name, img }) {
                     <div>${name}</div>
                 `;
                 slotMachineContainer.appendChild(finalWinnerDisplay);
-                
+
                 // Zaktualizuj UI po zakończeniu
                 winnerModalTitle.innerText = '✨ Gratulacje! ✨';
                 winnerModalActions.classList.remove('hidden'); // Pokaż przyciski
-                
+
                 // Konfetti!
                 confetti({
                     particleCount: 150,
@@ -422,7 +486,10 @@ btnDeleteWinner.addEventListener('click', async () => {
     const result = await apiPost('/delete', { name: currentWinner.name }); // Używamy currentWinner.name
     if (result.success) {
         winnerModal.style.display = 'none';
-        await fetchAuthorsAndUpdateList(); // Odśwież listę po usunięciu
+        // WebSocket załatwi aktualizację listy; fallback:
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            await fetchAuthorsAndUpdateList();
+        }
         if (!pollingInterval) updateUIState('stopped');
     }
 });

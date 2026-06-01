@@ -27,27 +27,30 @@ class AuthorsManager:
         self.authors_dict.clear()
 
 class AppManager:
-    def __init__(self, 
-                 authors_manager=None, 
-                 stop_event=None, 
-                 from_main_to_listener_queue=None, 
-                 from_listener_to_main_queue=None):
+    def __init__(self,
+                 authors_manager=None,
+                 stop_event=None,
+                 from_main_to_listener_queue=None,
+                 from_listener_to_main_queue=None,
+                 author_notification_queue=None):
         self.authors_manager = authors_manager or AuthorsManager(multiprocessing.Manager().dict())
         self.stop_event = stop_event or multiprocessing.Event()
         self.process = None
         self.fetching = False
         self.from_main_to_listener_queue = from_main_to_listener_queue or multiprocessing.Queue()
         self.from_listener_to_main_queue = from_listener_to_main_queue or multiprocessing.Queue()
+        self.author_notification_queue = author_notification_queue or multiprocessing.Queue()
 
     def run_process(self, video_url):
         self.process = multiprocessing.Process(
-             target=start_chat_listener, 
+             target=start_chat_listener,
              args=(
-                  video_url, 
-                  self.stop_event, 
-                  self.authors_manager, 
-                  self.from_main_to_listener_queue, 
-                  self.from_listener_to_main_queue
+                  video_url,
+                  self.stop_event,
+                  self.authors_manager,
+                  self.from_main_to_listener_queue,
+                  self.from_listener_to_main_queue,
+                  self.author_notification_queue
                   )
             )
         self.process.start()
@@ -116,27 +119,29 @@ def apply_url(url, from_listener_to_main_queue):
             from_listener_to_main_queue.put({"success": True, "message": "Listener started"})
         return chat
 
-def process_chat_messages(chat, stop_event, authors_manager, from_main_to_listener_queue):
+def process_chat_messages(chat, stop_event, authors_manager, from_main_to_listener_queue, author_notification_queue=None):
     while True:
         status = from_main_to_listener_queue.get()
         if status.get("status") == "shutdown":
             break
         stop_event.clear()
-        fetch_and_filter_messages(chat, status.get("keyword"), stop_event, authors_manager)
+        fetch_and_filter_messages(chat, status.get("keyword"), stop_event, authors_manager, author_notification_queue)
 
-def fetch_and_filter_messages(chat, keyword, stop_event, authors_manager):
+def fetch_and_filter_messages(chat, keyword, stop_event, authors_manager, author_notification_queue=None):
     while not stop_event.is_set() and chat.is_alive():
         try:
             for c in chat.get().sync_items():
                 if check_keyword_in_message(c.message, keyword):
                     authors_manager.add_author(c.author.name, c.author.imageUrl)
+                    if author_notification_queue is not None:
+                        author_notification_queue.put({"type": "authors_update", "authors": list(authors_manager.get_authors().values())})
         except Exception as e:
             pass 
 
 def check_keyword_in_message(message, keyword):
     return not keyword or keyword.lower() in message.lower()
 
-def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_listener_queue, from_listener_to_main_queue):
+def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_listener_queue, from_listener_to_main_queue, author_notification_queue=None):
         """
         Funkcja nasłuchująca czat, działająca w osobnym procesie.
         Dodaje unikalnych autorów do authors_list.
@@ -144,5 +149,5 @@ def start_chat_listener(video_url, stop_event, authors_manager, from_main_to_lis
         chat = apply_url(video_url, from_listener_to_main_queue)
         if not chat:
             return  # Jeśli URL jest nieprawidłowy, kończymy funkcję
-        
-        process_chat_messages(chat, stop_event, authors_manager, from_main_to_listener_queue)
+
+        process_chat_messages(chat, stop_event, authors_manager, from_main_to_listener_queue, author_notification_queue)
